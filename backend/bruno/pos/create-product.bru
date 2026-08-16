@@ -1,0 +1,22 @@
+meta {
+  name: Create Product
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/products
+  headers {
+    Authorization: Bearer {{token}}
+    Content-Type: application/json
+  }
+  body: json
+  {
+    "name": "Hamburguesa Clásica",
+    "category": "snacks",
+    "price": 9.50,
+    "currentStock": 25,
+    "minStock": 10,
+    "image": ""
+  }
+}

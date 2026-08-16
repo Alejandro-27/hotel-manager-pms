@@ -1,0 +1,22 @@
+meta {
+  name: Register Sale
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/sales
+  headers {
+    Authorization: Bearer {{token}}
+    Content-Type: application/json
+  }
+  body: json
+  {
+    "items": [
+      { "productId": "p1", "quantity": 2, "unitPrice": 12.50 },
+      { "productId": "p9", "quantity": 1, "unitPrice": 2.50 }
+    ],
+    "paymentMethod": "efectivo",
+    "roomId": null
+  }
+}

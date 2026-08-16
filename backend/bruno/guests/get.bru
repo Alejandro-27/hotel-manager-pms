@@ -1,0 +1,12 @@
+meta {
+  name: Get Guest by ID
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/guests/:id
+  headers {
+    Authorization: Bearer {{token}}
+  }
+}

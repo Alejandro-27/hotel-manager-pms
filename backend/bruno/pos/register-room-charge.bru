@@ -1,0 +1,21 @@
+meta {
+  name: Register Room Charge Sale
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/sales
+  headers {
+    Authorization: Bearer {{token}}
+    Content-Type: application/json
+  }
+  body: json
+  {
+    "items": [
+      { "productId": "p14", "quantity": 3, "unitPrice": 2.00 }
+    ],
+    "paymentMethod": "cargo_habitacion",
+    "roomId": "r102"
+  }
+}

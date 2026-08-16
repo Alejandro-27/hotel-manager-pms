@@ -1,0 +1,12 @@
+meta {
+  name: List Sales
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/sales
+  headers {
+    Authorization: Bearer {{token}}
+  }
+}

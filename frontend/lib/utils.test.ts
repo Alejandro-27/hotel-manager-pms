@@ -8,7 +8,8 @@ describe('cn', () => {
   })
 
   it('handles conditional classes', () => {
-    const result = cn('base', false && 'hidden', 'extra')
+    const shouldHide = false
+    const result = cn('base', shouldHide && 'hidden', 'extra')
     expect(result).toContain('base')
     expect(result).toContain('extra')
     expect(result).not.toContain('hidden')

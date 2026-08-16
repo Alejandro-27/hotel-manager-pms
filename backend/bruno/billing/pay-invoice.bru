@@ -1,0 +1,18 @@
+meta {
+  name: Pay Invoice
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/invoices/:id/pay
+  headers {
+    Authorization: Bearer {{token}}
+    Content-Type: application/json
+  }
+  body: json
+  {
+    "amount": 200,
+    "paymentMethod": "efectivo"
+  }
+}

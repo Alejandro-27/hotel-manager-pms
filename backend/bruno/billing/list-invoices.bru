@@ -1,0 +1,12 @@
+meta {
+  name: List Invoices
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/invoices
+  headers {
+    Authorization: Bearer {{token}}
+  }
+}

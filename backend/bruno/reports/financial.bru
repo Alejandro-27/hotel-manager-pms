@@ -1,0 +1,12 @@
+meta {
+  name: Financial Report
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/reports/financial
+  headers {
+    Authorization: Bearer {{token}}
+  }
+}

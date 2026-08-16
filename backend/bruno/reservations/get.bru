@@ -1,0 +1,12 @@
+meta {
+  name: Get Reservation by ID
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/reservations/:id
+  headers {
+    Authorization: Bearer {{token}}
+  }
+}

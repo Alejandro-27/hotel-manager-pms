@@ -1,0 +1,12 @@
+meta {
+  name: Check-in
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/reservations/:id/checkin
+  headers {
+    Authorization: Bearer {{token}}
+  }
+}

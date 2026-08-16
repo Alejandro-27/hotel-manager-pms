@@ -1,0 +1,12 @@
+meta {
+  name: Dashboard KPIs
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/reports/dashboard
+  headers {
+    Authorization: Bearer {{token}}
+  }
+}

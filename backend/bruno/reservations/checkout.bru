@@ -1,0 +1,12 @@
+meta {
+  name: Check-out
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/api/reservations/:id/checkout
+  headers {
+    Authorization: Bearer {{token}}
+  }
+}

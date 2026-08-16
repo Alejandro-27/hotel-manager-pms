@@ -1,0 +1,17 @@
+meta {
+  name: Update Room Status
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/api/rooms/:id/status
+  headers {
+    Authorization: Bearer {{token}}
+    Content-Type: application/json
+  }
+  body: json
+  {
+    "status": "ocupada"
+  }
+}

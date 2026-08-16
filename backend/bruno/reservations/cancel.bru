@@ -1,0 +1,12 @@
+meta {
+  name: Cancel Reservation
+  type: http
+  seq: 6
+}
+
+patch {
+  url: {{baseUrl}}/api/reservations/:id/cancel
+  headers {
+    Authorization: Bearer {{token}}
+  }
+}

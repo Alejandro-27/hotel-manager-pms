@@ -1,0 +1,12 @@
+meta {
+  name: Get Invoice by ID
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/invoices/:id
+  headers {
+    Authorization: Bearer {{token}}
+  }
+}

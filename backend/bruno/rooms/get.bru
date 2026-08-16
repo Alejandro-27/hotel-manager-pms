@@ -1,0 +1,12 @@
+meta {
+  name: Get Room by ID
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/rooms/:id
+  headers {
+    Authorization: Bearer {{token}}
+  }
+}

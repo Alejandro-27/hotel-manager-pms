@@ -1,0 +1,12 @@
+meta {
+  name: List Rooms
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/rooms
+  headers {
+    Authorization: Bearer {{token}}
+  }
+}

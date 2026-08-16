@@ -1,0 +1,21 @@
+meta {
+  name: Create Guest
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/guests
+  headers {
+    Authorization: Bearer {{token}}
+    Content-Type: application/json
+  }
+  body: json
+  {
+    "name": "Pedro López",
+    "document": "ES12345678",
+    "country": "ES",
+    "email": "pedro@email.com",
+    "phone": "+34612345678"
+  }
+}

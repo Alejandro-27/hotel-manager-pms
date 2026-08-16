@@ -1,0 +1,21 @@
+meta {
+  name: Create Room
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/rooms
+  headers {
+    Authorization: Bearer {{token}}
+    Content-Type: application/json
+  }
+  body: json
+  {
+    "number": "601",
+    "floor": 6,
+    "type": "suite",
+    "maxCapacity": 3,
+    "pricePerNight": 350
+  }
+}

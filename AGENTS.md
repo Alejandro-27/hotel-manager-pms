@@ -2,65 +2,74 @@
 
 ## Propósito
 
-Sistema de gestión hotelera (PMS) y punto de venta (POS) para catering. Frontend completo construido con Next.js. Actualmente funciona con datos mock (sin backend).
+Sistema de gestión hotelera (PMS) y punto de venta (POS) para catering. Monorepo con frontend Next.js (datos mock de momento) y backend Fastify en desarrollo.
 
 ## Stack
 
-- **Framework**: Next.js 16.1.6 (App Router)
-- **UI Library**: React 19.2.4
-- **Language**: TypeScript 5.7.3 (`strict: true`)
-- **Styling**: Tailwind CSS 4.2 + shadcn/ui (new-york style)
-- **Charts**: Recharts 2.15
-- **Forms**: React Hook Form + Zod (instalados, usar para validación)
-- **Icons**: Lucide React
-- **Package manager**: pnpm
+- **Monorepo**: pnpm workspaces (`frontend/`, `backend/`, `packages/*`)
+- **Frontend**: Next.js 16.1.6 (App Router), React 19.2.4, Tailwind CSS 4.2 + shadcn/ui, Recharts 2.15, React Hook Form + Zod
+- **Backend**: Fastify 5 + TypeScript (`tsx` para dev, `tsc` para build)
+- **Tipos compartidos**: `@hotel/types` en `packages/types/`
+- **Package manager**: pnpm (NO npm)
+- **Testing**: Vitest + React Testing Library (frontend)
 
-## Estructura importante
+## Estructura del monorepo
 
 ```
-app/
-├── page.tsx              ← Página principal, controla auth + routing por useState
-├── layout.tsx            ← Root layout
-├── globals.css           ← Theme variables light/dark
-├── designs/page.tsx      ← Página de mockups (solo imágenes)
-components/
-├── app-sidebar.tsx       ← Navegación lateral
-├── auth-screen.tsx       ← Login/registro (ficticio)
-├── ui/                   ← ~50 shadcn/ui components
-└── views/                ← 8 vistas principales del sistema
-    ├── dashboard-view.tsx  ← KPIs + gráficos
-    ├── calendar-view.tsx   ← Calendario Gantt de reservas
-    ├── guests-view.tsx     ← Huéspedes + wizard de reserva
-    ├── pos-view.tsx        ← TPV catering + inventario
-    ├── billing-view.tsx    ← Facturas y pagos
-    ├── rooms-view.tsx      ← Gestión de habitaciones
-    ├── settings-view.tsx   ← Configuración del sistema
-    └── reports-view.tsx    ← Informes y KPIs avanzados
-lib/
-├── store.ts              ← Mock data, tipos, funciones helper
-├── types.ts              ← Tipos de dominio
-├── constants.ts          ← Configuraciones compartidas
-└── utils.ts              ← cn(), formatCurrency()
+packages/
+└── types/                  ← @hotel/types — tipos de dominio compartidos
+frontend/                   ← @hotel/frontend — Next.js (datos mock)
+├── app/
+│   ├── page.tsx            ← Página principal, controla auth + routing por useState
+│   ├── layout.tsx          ← Root layout
+│   ├── globals.css         ← Theme variables light/dark
+│   └── designs/page.tsx    ← Página de mockups (solo imágenes)
+├── components/
+│   ├── app-sidebar.tsx     ← Navegación lateral
+│   ├── auth-screen.tsx     ← Login/registro (ficticio, validado con zod)
+│   ├── ui/                 ← ~50 shadcn/ui components
+│   └── views/              ← 8 vistas principales del sistema
+│       ├── dashboard-view.tsx  ← KPIs + gráficos
+│       ├── calendar-view.tsx   ← Calendario Gantt de reservas
+│       ├── guests-view.tsx     ← Huéspedes + wizard de reserva
+│       ├── pos-view.tsx        ← TPV catering + inventario
+│       ├── billing-view.tsx    ← Facturas y pagos
+│       ├── rooms-view.tsx      ← Gestión de habitaciones
+│       ├── settings-view.tsx   ← Configuración del sistema
+│       └── reports-view.tsx    ← Informes y KPIs avanzados
+└── lib/
+    ├── store.ts           ← Mock data + funciones helper (re-exporta tipos)
+    ├── types.ts           ← Re-export de @hotel/types (backward compat)
+    ├── validations.ts     ← Schemas zod
+    ├── constants.tsx      ← Configuraciones compartidas
+    └── utils.ts           ← cn(), formatCurrency()
+backend/                    ← @hotel/backend — Fastify API
+└── src/
+    ├── app.ts            ← Instancia Fastify (exportada para Vercel)
+    └── index.ts          ← Entry point (listen)
 ```
 
 ## Comandos importantes
 
 ```bash
-pnpm dev          # Iniciar servidor de desarrollo
-pnpm build        # Build de producción
-pnpm start        # Iniciar en producción
-pnpm lint         # Ejecutar ESLint
+pnpm dev          # Frontend (Next.js dev server)
+pnpm dev:api      # Backend (tsx watch)
+pnpm build        # Build frontend
+pnpm build:api    # Build backend (tsc → dist/)
+pnpm lint         # ESLint frontend
+pnpm test         # Vitest frontend
 ```
 
 ## Convenciones del proyecto
 
-- Componentes UI en `components/ui/` siguen el patrón shadcn/ui
-- Vistas principales en `components/views/` — una por módulo del sistema
+- Componentes UI en `frontend/components/ui/` siguen el patrón shadcn/ui
+- Vistas principales en `frontend/components/views/` — una por módulo del sistema
 - `"use client"` solo en componentes interactivos
 - Tema claro/oscuro con CSS variables en `globals.css`
-- Navegación lateral con componentes shadcn Sidebar
+- Backend: módulos en `backend/src/`, imports relativos con extensión `.js` (moduleResolution nodenext)
+- Tipos de dominio SIEMPRE en `packages/types/src/index.ts` (nunca duplicar en frontend/backend)
 
-## Datos del dominio (tipos clave)
+## Datos del dominio (tipos clave en @hotel/types)
 
 - `Room` — Habitación con número, planta, tipo, capacidad, precio, estado
 - `Guest` — Huésped con documento, país, email, teléfono
@@ -85,18 +94,19 @@ pnpm lint         # Ejecutar ESLint
 
 ## Cosas que NO deben modificarse sin razón clara
 
-- `components/ui/` — Componentes shadcn. Solo modificar si es necesario para el diseño.
-- `globals.css` variables de tema — Cambiar solo con cuidado para mantener consistencia visual.
-- Tipos de dominio en `lib/store.ts` — Cambios aquí afectan todas las vistas.
-- Estructura de `components/views/` — Mantener una vista por archivo.
+- `frontend/components/ui/` — Componentes shadcn. Solo modificar si es necesario para el diseño.
+- `frontend/app/globals.css` variables de tema — Cambiar solo con cuidado para mantener consistencia visual.
+- Tipos de dominio en `packages/types/` — Cambios aquí afectan frontend Y backend.
+- Estructura de `frontend/components/views/` — Mantener una vista por archivo.
 
 ## Reglas para añadir nuevas funcionalidades
 
-1. Nueva vista → Crear archivo en `components/views/` y agregar enrutamiento
-2. Nuevo componente UI → Usar shadcn/ui existente o crear en `components/ui/` siguiendo patrones establecidos
-3. Nuevo tipo de dominio → Agregar en `lib/types.ts`
-4. Nueva función helper → Agregar en `lib/utils.ts`
+1. Nueva vista → Crear archivo en `frontend/components/views/` y agregar enrutamiento
+2. Nuevo componente UI → Usar shadcn/ui existente o crear en `frontend/components/ui/` siguiendo patrones establecidos
+3. Nuevo tipo de dominio → Agregar en `packages/types/src/index.ts` (nunca en frontend)
+4. Nueva función helper → Agregar en `frontend/lib/utils.ts`
 5. Validación de formularios → Usar schemas de zod con react-hook-form
+6. Nuevo endpoint API → Crear módulo en `backend/src/`
 
 ## Reglas para testing
 
@@ -112,9 +122,6 @@ pnpm lint         # Ejecutar ESLint
 
 ## Problemas conocidos
 
-- `ignoreBuildErrors: true` en next.config.mjs (CRITICAL — silencia errores TS)
 - Auth completamente ficticia (solo setTimeout)
 - Todos los datos son mock, sin persistencia
-- `formatCurrency` duplicado en 3 archivos (ya centralizado en lib/utils.ts)
-- Hooks duplicados en `hooks/` y `components/ui/` (ya eliminados los de hooks/)
-- Sin tests, configuración pendiente
+- Backend solo tiene endpoint `/health`, sin módulos ni DB aún

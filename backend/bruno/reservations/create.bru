@@ -1,0 +1,24 @@
+meta {
+  name: Create Reservation
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/reservations
+  headers {
+    Authorization: Bearer {{token}}
+    Content-Type: application/json
+  }
+  body: json
+  {
+    "guestId": "g1",
+    "roomId": "r101",
+    "checkIn": "2026-03-01",
+    "checkOut": "2026-03-05",
+    "guests": 2,
+    "paymentMethod": "tarjeta",
+    "advancePayment": 150,
+    "notes": ""
+  }
+}

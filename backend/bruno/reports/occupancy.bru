@@ -1,0 +1,12 @@
+meta {
+  name: Occupancy Report
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/reports/occupancy
+  headers {
+    Authorization: Bearer {{token}}
+  }
+}

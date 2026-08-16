@@ -1,0 +1,17 @@
+meta {
+  name: Update Guest
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/guests/:id
+  headers {
+    Authorization: Bearer {{token}}
+    Content-Type: application/json
+  }
+  body: json
+  {
+    "phone": "+34699887766"
+  }
+}

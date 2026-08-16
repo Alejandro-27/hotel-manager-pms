@@ -1,0 +1,17 @@
+meta {
+  name: Update Room
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/rooms/:id
+  headers {
+    Authorization: Bearer {{token}}
+    Content-Type: application/json
+  }
+  body: json
+  {
+    "pricePerNight": 380
+  }
+}

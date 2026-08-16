@@ -11,6 +11,9 @@ coverage/
 # TypeScript
 *.tsbuildinfo
 
+# Backend build output
+dist/
+
 # Environment
 .env
 .env*.local

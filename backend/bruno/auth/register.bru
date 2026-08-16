@@ -1,0 +1,23 @@
+meta {
+  name: Register User
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/auth/register
+  body: json
+  {
+    "name": "Admin Hotel",
+    "email": "admin@hotel.com",
+    "password": "Admin123!",
+    "role": "admin",
+    "hotelName": "Hotel Paraíso"
+  }
+}
+
+script:post-response {
+  if (res.status === 200 || res.status === 201) {
+    bru.setVar("token", res.body.token)
+  }
+}

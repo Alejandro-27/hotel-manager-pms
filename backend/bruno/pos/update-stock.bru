@@ -1,0 +1,17 @@
+meta {
+  name: Update Product Stock
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{baseUrl}}/api/products/:id/stock
+  headers {
+    Authorization: Bearer {{token}}
+    Content-Type: application/json
+  }
+  body: json
+  {
+    "currentStock": 30
+  }
+}

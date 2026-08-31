@@ -10,8 +10,17 @@ import {
   ClipboardList,
   AlertTriangle,
   TrendingUp,
+  DoorOpen,
+  Users,
+  Sparkles,
+  Wrench,
+  CalendarCheck,
+  UtensilsCrossed,
 } from "lucide-react"
 import {
+  rooms,
+  reservations,
+  sales,
   getOccupancyRate,
   getDailyRevenue,
   getPendingCheckins,
@@ -19,7 +28,9 @@ import {
   monthlyRevenueData,
   getGuestById,
   getRoomById,
+  getProductById,
 } from "@/lib/store"
+import type { Product } from "@/lib/types"
 import { formatCurrency } from "@/lib/utils"
 import {
   ChartContainer,
@@ -45,6 +56,44 @@ export function DashboardView() {
   const dailyRevenue = useMemo(() => getDailyRevenue(), [])
   const pendingCheckins = useMemo(() => getPendingCheckins(), [])
   const lowStock = useMemo(() => getLowStockProducts(), [])
+
+  const stats = useMemo(() => {
+    const byStatus = {
+      libre: rooms.filter((r) => r.status === "libre").length,
+      ocupada: rooms.filter((r) => r.status === "ocupada").length,
+      mantenimiento: rooms.filter((r) => r.status === "mantenimiento").length,
+      limpieza: rooms.filter((r) => r.status === "limpieza").length,
+    }
+
+    return { byStatus }
+  }, [])
+
+  const todayReservations = useMemo(
+    () =>
+      reservations
+        .filter((r) => r.checkIn === "2026-02-20" || r.status === "checkin")
+        .slice(0, 5),
+    []
+  )
+
+  const topProducts = useMemo(() => {
+    const countMap: Record<string, number> = {}
+    sales.forEach((s) => {
+      s.items.forEach((i) => {
+        countMap[i.productId] = (countMap[i.productId] || 0) + i.quantity
+      })
+    })
+    return Object.entries(countMap)
+      .map(([id, qty]) => {
+        const product = getProductById(id)
+        return { product, qty }
+      })
+      .filter((x): x is { product: Product; qty: number } => x.product !== undefined)
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 5)
+  }, [])
+
+  const maxTopQty = topProducts.length ? topProducts[0].qty : 1
 
   return (
     <div className="flex flex-col gap-6">
@@ -78,7 +127,7 @@ export function DashboardView() {
               <div>
                 <p className="text-2xl font-bold text-foreground">{occupancy}%</p>
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <TrendingUp className="size-3" />
+                  <TrendingUp className="size-3 text-emerald-600" />
                   +5% vs ayer
                 </p>
               </div>
@@ -141,7 +190,7 @@ export function DashboardView() {
           <CardContent>
             <p className="text-2xl font-bold text-foreground">{lowStock.length}</p>
             <div className="mt-2 flex flex-col gap-1.5">
-              {lowStock.map((p) => (
+              {lowStock.slice(0, 3).map((p) => (
                 <div key={p.id} className="flex items-center gap-2">
                   <div className="flex-1">
                     <div className="flex items-center justify-between text-xs">
@@ -157,41 +206,145 @@ export function DashboardView() {
         </Card>
       </div>
 
-      {/* Revenue Chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-foreground">Ingresos vs. Gastos Mensuales</CardTitle>
-          <CardDescription>Ultimos 6 meses de actividad financiera</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ChartContainer config={chartConfig} className="h-[350px] w-full">
-            <BarChart data={monthlyRevenueData} barGap={4}>
-              <CartesianGrid vertical={false} strokeDasharray="3 3" />
-              <XAxis
-                dataKey="month"
-                tickLine={false}
-                axisLine={false}
-                tickMargin={8}
-              />
-              <YAxis
-                tickLine={false}
-                axisLine={false}
-                tickMargin={8}
-                tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
-              />
-              <ChartTooltip
-                content={
-                  <ChartTooltipContent
-                    formatter={(value) => formatCurrency(Number(value))}
-                  />
-                }
-              />
-              <Bar dataKey="ingresos" fill="var(--color-ingresos)" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="gastos" fill="var(--color-gastos)" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ChartContainer>
-        </CardContent>
-      </Card>
+      {/* Room Status Summary */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <Card className="border-emerald-200/60">
+          <CardContent className="pt-5 pb-4 flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-md bg-emerald-100">
+              <DoorOpen className="size-5 text-emerald-700" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Habitaciones Libres</p>
+              <p className="text-xl font-bold text-foreground">{stats.byStatus.libre}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-primary/20">
+          <CardContent className="pt-5 pb-4 flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-md bg-primary/10">
+              <Users className="size-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Habitaciones Ocupadas</p>
+              <p className="text-xl font-bold text-foreground">{stats.byStatus.ocupada}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-sky-200/60">
+          <CardContent className="pt-5 pb-4 flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-md bg-sky-100">
+              <Sparkles className="size-5 text-sky-700" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">En Limpieza</p>
+              <p className="text-xl font-bold text-foreground">{stats.byStatus.limpieza}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-amber-200/60">
+          <CardContent className="pt-5 pb-4 flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-md bg-amber-100">
+              <Wrench className="size-5 text-amber-700" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">En Mantenimiento</p>
+              <p className="text-xl font-bold text-foreground">{stats.byStatus.mantenimiento}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Charts + Side panels */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Revenue Chart */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-foreground">Ingresos vs. Gastos Mensuales</CardTitle>
+            <CardDescription>Ultimos 6 meses de actividad financiera</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={chartConfig} className="h-[350px] w-full">
+              <BarChart data={monthlyRevenueData} barGap={4}>
+                <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+                />
+                <ChartTooltip
+                  content={
+                    <ChartTooltipContent
+                      formatter={(value) => formatCurrency(Number(value))}
+                    />
+                  }
+                />
+                <Bar dataKey="ingresos" fill="var(--color-ingresos)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="gastos" fill="var(--color-gastos)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+
+        {/* Check-ins today / active */}
+        <div className="flex flex-col gap-6">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-foreground text-base">
+                <CalendarCheck className="size-4" />
+                Llegadas de Hoy
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              {todayReservations.length === 0 && (
+                <p className="text-sm text-muted-foreground">No hay llegadas programadas</p>
+              )}
+              {todayReservations.map((r) => {
+                const guest = getGuestById(r.guestId)
+                const room = getRoomById(r.roomId)
+                const isCheckin = r.status === "checkin"
+                return (
+                  <div key={r.id} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="flex size-8 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground">
+                        {guest?.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground leading-tight">{guest?.name}</p>
+                        <p className="text-xs text-muted-foreground">Hab. {room?.number}</p>
+                      </div>
+                    </div>
+                    <Badge variant={isCheckin ? "secondary" : "outline"} className="text-[10px]">
+                      {isCheckin ? "Alojado" : "Confirmado"}
+                    </Badge>
+                  </div>
+                )
+              })}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-foreground text-base">
+                <UtensilsCrossed className="size-4" />
+                Top Productos
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              {topProducts.map((t, _i) => (
+                <div key={t.product.id}>
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="text-foreground truncate">{t.product.name}</span>
+                    <span className="text-muted-foreground text-xs">{t.qty} unid.</span>
+                  </div>
+                  <Progress value={(t.qty / maxTopQty) * 100} className="h-1.5" />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   )
 }

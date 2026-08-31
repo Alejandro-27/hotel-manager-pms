@@ -67,7 +67,7 @@ export function AppSidebar({ activeView, onNavigate, userName, userEmail, onLogo
               <div className="flex size-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
                 <Hotel className="size-4" />
               </div>
-              <div className="flex flex-col gap-0.5 leading-none">
+              <div className="flex flex-col gap-0.5 leading-none group-data-[state=collapsed]:hidden">
                 <span className="font-semibold text-sm">HotelManager</span>
                 <span className="text-xs opacity-70">PMS & POS</span>
               </div>
@@ -162,7 +162,7 @@ export function AppSidebar({ activeView, onNavigate, userName, userEmail, onLogo
               <div className="flex size-7 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-accent-foreground text-xs font-semibold">
                 {(userName || "A").charAt(0).toUpperCase()}
               </div>
-              <div className="flex flex-col gap-0.5 leading-none">
+              <div className="flex flex-col gap-0.5 leading-none group-data-[state=collapsed]:hidden">
                 <span className="text-xs font-medium">{userName || "Administrador"}</span>
                 <span className="text-xs opacity-50">{userEmail || "admin@hotel.com"}</span>
               </div>

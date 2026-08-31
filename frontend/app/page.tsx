@@ -4,6 +4,7 @@ import { useState } from "react"
 import {
   SidebarProvider,
   SidebarInset,
+  SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import { DashboardView } from "@/components/views/dashboard-view"
@@ -60,6 +61,7 @@ export default function Page() {
       <SidebarInset>
         {/* Top Bar */}
         <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-card px-4">
+          <SidebarTrigger />
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>

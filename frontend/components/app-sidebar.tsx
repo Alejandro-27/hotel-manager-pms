@@ -25,6 +25,7 @@ import {
   SidebarMenuItem,
   SidebarFooter,
   SidebarSeparator,
+  SidebarRail,
 } from "@/components/ui/sidebar"
 import {
   Collapsible,
@@ -178,6 +179,7 @@ export function AppSidebar({ activeView, onNavigate, userName, userEmail, onLogo
           )}
         </SidebarMenu>
       </SidebarFooter>
+      <SidebarRail />
     </Sidebar>
   )
 }

@@ -17,19 +17,25 @@ describe('cn', () => {
 })
 
 describe('formatCurrency', () => {
-  it('formats EUR currency', () => {
-    const result = formatCurrency(1234.56)
-    expect(result).toContain('1234,56')
-    expect(result).toContain('€')
+  it('formats COP currency by default', () => {
+    const result = formatCurrency(1234567)
+    expect(result).toContain('1.234.567')
+    expect(result).toContain('$')
   })
 
   it('formats zero', () => {
     const result = formatCurrency(0)
-    expect(result).toContain('0,00')
+    expect(result).toContain('0')
   })
 
   it('formats negative values', () => {
-    const result = formatCurrency(-50)
-    expect(result).toContain('50,00')
+    const result = formatCurrency(-50000)
+    expect(result).toContain('50.000')
+  })
+
+  it('formats EUR when specified', () => {
+    const result = formatCurrency(1234.56, 'EUR')
+    expect(result).toContain('1234,56')
+    expect(result).toContain('€')
   })
 })

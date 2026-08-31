@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTheme } from "next-themes"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -34,14 +35,15 @@ import {
 } from "lucide-react"
 
 export function SettingsView() {
+  const { theme, setTheme } = useTheme()
   const [hotelName, setHotelName] = useState("Gran Hotel Central")
   const [hotelEmail, setHotelEmail] = useState("info@granhotelcentral.com")
   const [hotelPhone, setHotelPhone] = useState("+34 912 345 678")
   const [hotelAddress, setHotelAddress] = useState("Calle Mayor 42, 28013 Madrid, Espana")
   const [hotelWebsite, setHotelWebsite] = useState("www.granhotelcentral.com")
   const [hotelStars, setHotelStars] = useState("4")
-  const [currency, setCurrency] = useState("EUR")
-  const [timezone, setTimezone] = useState("Europe/Madrid")
+  const [currency, setCurrency] = useState("COP")
+  const [timezone, setTimezone] = useState("America/Bogota")
   const [language, setLanguage] = useState("es")
   const [taxRate, setTaxRate] = useState("10")
   const [advancePercent, setAdvancePercent] = useState("30")
@@ -171,6 +173,7 @@ export function SettingsView() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="COP">COP - Peso Colombiano</SelectItem>
                       <SelectItem value="EUR">EUR - Euro</SelectItem>
                       <SelectItem value="USD">USD - Dolar</SelectItem>
                       <SelectItem value="GBP">GBP - Libra</SelectItem>
@@ -199,6 +202,7 @@ export function SettingsView() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="America/Bogota">America/Bogota (COT)</SelectItem>
                       <SelectItem value="Europe/Madrid">Europe/Madrid (CET)</SelectItem>
                       <SelectItem value="Europe/London">Europe/London (GMT)</SelectItem>
                       <SelectItem value="America/New_York">America/New York (EST)</SelectItem>
@@ -507,15 +511,24 @@ export function SettingsView() {
               <div>
                 <Label className="text-sm mb-2 block">Tema</Label>
                 <div className="grid grid-cols-3 gap-3 max-w-md">
-                  <button className="flex flex-col items-center gap-2 rounded-md border-2 border-primary p-3">
+                  <button
+                    onClick={() => setTheme("light")}
+                    className={`flex flex-col items-center gap-2 rounded-md border-2 p-3 transition-colors ${theme === "light" ? "border-primary" : "border-border hover:border-primary/50"}`}
+                  >
                     <div className="size-8 rounded-md bg-background border" />
                     <span className="text-xs font-medium text-foreground">Claro</span>
                   </button>
-                  <button className="flex flex-col items-center gap-2 rounded-md border p-3 hover:border-primary/50 transition-colors">
+                  <button
+                    onClick={() => setTheme("dark")}
+                    className={`flex flex-col items-center gap-2 rounded-md border-2 p-3 transition-colors ${theme === "dark" ? "border-primary" : "border-border hover:border-primary/50"}`}
+                  >
                     <div className="size-8 rounded-md bg-foreground" />
                     <span className="text-xs font-medium text-foreground">Oscuro</span>
                   </button>
-                  <button className="flex flex-col items-center gap-2 rounded-md border p-3 hover:border-primary/50 transition-colors">
+                  <button
+                    onClick={() => setTheme("system")}
+                    className={`flex flex-col items-center gap-2 rounded-md border-2 p-3 transition-colors ${theme === "system" ? "border-primary" : "border-border hover:border-primary/50"}`}
+                  >
                     <div className="size-8 rounded-md bg-gradient-to-br from-background to-foreground" />
                     <span className="text-xs font-medium text-foreground">Sistema</span>
                   </button>

@@ -40,6 +40,7 @@ import {
 } from "lucide-react"
 import { rooms, reservations, getGuestById, type Room, type RoomStatus } from "@/lib/store"
 import { roomStatusConfig as statusConfig, roomTypeLabels as typeLabels } from "@/lib/constants"
+import { formatCurrency } from "@/lib/utils"
 
 export function RoomsView() {
   const [filterFloor, setFilterFloor] = useState<string>("all")
@@ -194,80 +195,82 @@ export function RoomsView() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Habitacion</TableHead>
-                <TableHead>Planta</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Capacidad</TableHead>
-                <TableHead>Tarifa/Noche</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Huesped Actual</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredRooms.map((room) => {
-                const config = statusConfig[room.status]
-                const occupant = getOccupant(room.id)
-                return (
-                  <TableRow key={room.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="flex size-8 items-center justify-center rounded-md bg-muted">
-                          <BedDouble className="size-4 text-muted-foreground" />
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Habitacion</TableHead>
+                  <TableHead>Planta</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Capacidad</TableHead>
+                  <TableHead>Tarifa/Noche</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead>Huesped Actual</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredRooms.map((room) => {
+                  const config = statusConfig[room.status]
+                  const occupant = getOccupant(room.id)
+                  return (
+                    <TableRow key={room.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div className="flex size-8 items-center justify-center rounded-md bg-muted">
+                            <BedDouble className="size-4 text-muted-foreground" />
+                          </div>
+                          <span className="font-semibold text-foreground">{room.number}</span>
                         </div>
-                        <span className="font-semibold text-foreground">{room.number}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1 text-muted-foreground">
-                        <Building2 className="size-3" />
-                        <span className="text-sm">Planta {room.floor}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-xs capitalize">
-                        {typeLabels[room.type]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1 text-muted-foreground">
-                        <Users className="size-3" />
-                        <span className="text-sm">{room.maxCapacity}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1 text-foreground font-medium">
-                        <Euro className="size-3" />
-                        <span className="text-sm">{room.pricePerNight.toFixed(2)}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={`${config.className} text-xs border-0 gap-1`}>
-                        {config.icon}
-                        {config.label}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {occupant ? (
-                        <span className="text-sm text-foreground">{occupant.name}</span>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">--</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="outline" size="sm" onClick={() => handleOpenEdit(room)}>
-                        <Pencil className="mr-1 size-3" />
-                        Editar
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <Building2 className="size-3" />
+                          <span className="text-sm">Planta {room.floor}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs capitalize">
+                          {typeLabels[room.type]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <Users className="size-3" />
+                          <span className="text-sm">{room.maxCapacity}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1 text-foreground font-medium">
+                          <Euro className="size-3" />
+                          <span className="text-sm">{formatCurrency(room.pricePerNight)}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={`${config.className} text-xs border-0 gap-1`}>
+                          {config.icon}
+                          {config.label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {occupant ? (
+                          <span className="text-sm text-foreground">{occupant.name}</span>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">--</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="outline" size="sm" onClick={() => handleOpenEdit(room)}>
+                          <Pencil className="mr-1 size-3" />
+                          Editar
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
@@ -315,7 +318,7 @@ export function RoomsView() {
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-sm">Tarifa por noche (EUR)</Label>
+                  <Label className="text-sm">Tarifa por noche</Label>
                   <Input
                     type="number"
                     value={editPrice}
@@ -373,8 +376,8 @@ export function RoomsView() {
               </div>
             </div>
             <div>
-              <Label className="text-sm">Tarifa por noche (EUR)</Label>
-              <Input type="number" placeholder="150" className="mt-1" />
+              <Label className="text-sm">Tarifa por noche</Label>
+              <Input type="number" placeholder="150.000" className="mt-1" />
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setAddDialogOpen(false)}>Cancelar</Button>

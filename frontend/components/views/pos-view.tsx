@@ -43,6 +43,7 @@ import {
   getRoomById,
   type Product,
 } from "@/lib/store"
+import { formatCurrency } from "@/lib/utils"
 
 interface CartItem {
   product: Product
@@ -155,7 +156,7 @@ export function PosView() {
                               </div>
                               <div className="flex items-center justify-between">
                                 <span className="text-lg font-bold text-primary">
-                                  {product.price.toFixed(2)} EUR
+                                  {formatCurrency(product.price)}
                                 </span>
                                 {isLowStock && (
                                   <Badge variant="destructive" className="text-[9px]">
@@ -200,7 +201,7 @@ export function PosView() {
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-foreground truncate">{item.product.name}</p>
                             <p className="text-xs text-muted-foreground">
-                              {item.product.price.toFixed(2)} EUR x {item.quantity}
+                              {formatCurrency(item.product.price)} x {item.quantity}
                             </p>
                           </div>
                           <div className="flex items-center gap-1">
@@ -238,7 +239,7 @@ export function PosView() {
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-foreground">Total</span>
                         <span className="text-xl font-bold text-primary">
-                          {cartTotal.toFixed(2)} EUR
+                          {formatCurrency(cartTotal)}
                         </span>
                       </div>
 
@@ -297,7 +298,7 @@ export function PosView() {
                           disabled={!paymentMethod || (paymentMethod === "cargo_habitacion" && !selectedRoom)}
                           onClick={clearCart}
                         >
-                          Cobrar {cartTotal.toFixed(2)} EUR
+                          Cobrar {formatCurrency(cartTotal)}
                         </Button>
                       </div>
                     </div>
@@ -317,49 +318,51 @@ export function PosView() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Producto</TableHead>
-                    <TableHead>Categoria</TableHead>
-                    <TableHead>Precio</TableHead>
-                    <TableHead>Stock Actual</TableHead>
-                    <TableHead>Stock Minimo</TableHead>
-                    <TableHead>Estado</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {products.map((product) => {
-                    const isLow = product.currentStock < product.minStock
-                    return (
-                      <TableRow key={product.id}>
-                        <TableCell className="font-medium text-foreground">{product.name}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="capitalize text-xs">
-                            {product.category}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">{product.price.toFixed(2)} EUR</TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            defaultValue={product.currentStock}
-                            className="w-20 h-8 text-sm"
-                          />
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">{product.minStock}</TableCell>
-                        <TableCell>
-                          {isLow ? (
-                            <Badge variant="destructive" className="text-xs">Stock bajo</Badge>
-                          ) : (
-                            <Badge variant="secondary" className="text-xs">OK</Badge>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Producto</TableHead>
+                      <TableHead>Categoria</TableHead>
+                      <TableHead>Precio</TableHead>
+                      <TableHead>Stock Actual</TableHead>
+                      <TableHead>Stock Minimo</TableHead>
+                      <TableHead>Estado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {products.map((product) => {
+                      const isLow = product.currentStock < product.minStock
+                      return (
+                        <TableRow key={product.id}>
+                          <TableCell className="font-medium text-foreground">{product.name}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="capitalize text-xs">
+                              {product.category}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">{formatCurrency(product.price)}</TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              defaultValue={product.currentStock}
+                              className="w-20 h-8 text-sm"
+                            />
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">{product.minStock}</TableCell>
+                          <TableCell>
+                            {isLow ? (
+                              <Badge variant="destructive" className="text-xs">Stock bajo</Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-xs">OK</Badge>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

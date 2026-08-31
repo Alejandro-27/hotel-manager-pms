@@ -5,6 +5,18 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(amount)
+const currencyConfig: Record<string, { locale: string; currency: string }> = {
+  COP: { locale: 'es-CO', currency: 'COP' },
+  EUR: { locale: 'es-ES', currency: 'EUR' },
+  USD: { locale: 'en-US', currency: 'USD' },
+  MXN: { locale: 'es-MX', currency: 'MXN' },
+}
+
+export function formatCurrency(amount: number, code: string = 'COP'): string {
+  const config = currencyConfig[code] ?? currencyConfig.COP
+  return new Intl.NumberFormat(config.locale, {
+    style: 'currency',
+    currency: config.currency,
+    maximumFractionDigits: config.currency === 'COP' ? 0 : 2,
+  }).format(amount)
 }

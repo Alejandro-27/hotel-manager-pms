@@ -496,7 +496,7 @@ export function ReportsView() {
                   <BarChart data={dailySales}>
                     <CartesianGrid vertical={false} strokeDasharray="3 3" />
                     <XAxis dataKey="day" tickLine={false} axisLine={false} tickMargin={8} />
-                    <YAxis tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(v) => `${v}EUR`} />
+                    <YAxis tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(v) => formatCurrency(v)} />
                     <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />} />
                     <Bar dataKey="amount" fill="var(--color-amount)" radius={[4, 4, 0, 0]} />
                   </BarChart>

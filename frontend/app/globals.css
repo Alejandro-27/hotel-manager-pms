@@ -123,3 +123,185 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Invoice Voucher Print Styles */
+.voucher-print {
+  font-family: 'Courier New', monospace;
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 16px;
+  color: #000;
+  background: #fff;
+}
+
+.voucher-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.voucher-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.voucher-logo-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1a1a2e;
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  border-radius: 4px;
+}
+
+.voucher-hotel-name {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.voucher-hotel-sub {
+  font-size: 10px;
+  color: #666;
+}
+
+.voucher-invoice-info {
+  text-align: right;
+  font-size: 11px;
+}
+
+.voucher-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.voucher-mono {
+  font-family: monospace;
+  font-weight: 600;
+}
+
+.voucher-section {
+  margin-bottom: 12px;
+}
+
+.voucher-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.voucher-value {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.voucher-small {
+  font-size: 11px;
+  color: #555;
+}
+
+.voucher-table {
+  margin-top: 8px;
+}
+
+.voucher-table-header,
+.voucher-table-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 4px;
+  padding: 4px 0;
+  font-size: 11px;
+}
+
+.voucher-table-header {
+  font-weight: 700;
+  border-bottom: 1px solid #000;
+}
+
+.voucher-table-row {
+  border-bottom: 1px dashed #ccc;
+}
+
+.voucher-table-row span:last-child {
+  text-align: right;
+  font-weight: 600;
+}
+
+.voucher-totals {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.voucher-total-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+}
+
+.voucher-green {
+  color: #16a34a;
+}
+
+.voucher-bold {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.voucher-footer {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 11px;
+  color: #666;
+  border-top: 1px dashed #ccc;
+  padding-top: 12px;
+}
+
+/* Print visibility helpers */
+.print-only {
+  display: none;
+}
+
+.no-print {
+  display: contents;
+}
+
+/* Print media query */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  .print-only,
+  .print-only * {
+    visibility: visible !important;
+  }
+
+  .print-only {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
+    margin: 0;
+    background: #fff;
+    box-shadow: none;
+  }
+
+  .print-only .voucher-print {
+    max-width: 100%;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}

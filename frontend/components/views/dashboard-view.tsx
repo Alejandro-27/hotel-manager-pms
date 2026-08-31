@@ -20,6 +20,7 @@ import {
   getGuestById,
   getRoomById,
 } from "@/lib/store"
+import { formatCurrency } from "@/lib/utils"
 import {
   ChartContainer,
   ChartTooltip,
@@ -93,7 +94,7 @@ export function DashboardView() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-foreground">
-              {new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(dailyRevenue)}
+              {formatCurrency(dailyRevenue)}
             </p>
             <div className="mt-2 flex gap-2">
               <Badge variant="secondary" className="text-xs">
@@ -181,9 +182,7 @@ export function DashboardView() {
               <ChartTooltip
                 content={
                   <ChartTooltipContent
-                    formatter={(value) =>
-                      new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(Number(value))
-                    }
+                    formatter={(value) => formatCurrency(Number(value))}
                   />
                 }
               />

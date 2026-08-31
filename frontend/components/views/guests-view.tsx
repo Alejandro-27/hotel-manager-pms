@@ -44,6 +44,7 @@ import {
   rooms,
   type ReservationStatus,
 } from "@/lib/store"
+import { formatCurrency } from "@/lib/utils"
 
 const statusStyles: Record<ReservationStatus, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
   confirmada: { label: "Confirmada", variant: "secondary" },
@@ -273,7 +274,7 @@ export function GuestsView() {
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="text-xs text-muted-foreground">Max: {room.maxCapacity}</span>
-                        <span className="font-semibold text-foreground">{room.pricePerNight} EUR/noche</span>
+                        <span className="font-semibold text-foreground">{formatCurrency(room.pricePerNight)}/noche</span>
                         <ChevronRight className="size-4 text-muted-foreground" />
                       </div>
                     </div>
@@ -287,16 +288,16 @@ export function GuestsView() {
               <div className="rounded-md border p-4 bg-muted/50">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm text-muted-foreground">Subtotal estimado</span>
-                  <span className="font-semibold text-foreground">480,00 EUR</span>
+                  <span className="font-semibold text-foreground">{formatCurrency(480)}</span>
                 </div>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm text-muted-foreground">Anticipo (30%)</span>
-                  <span className="font-semibold text-primary">144,00 EUR</span>
+                  <span className="font-semibold text-primary">{formatCurrency(144)}</span>
                 </div>
                 <Separator className="my-2" />
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-foreground">A pagar ahora</span>
-                  <span className="text-lg font-bold text-primary">144,00 EUR</span>
+                  <span className="text-lg font-bold text-primary">{formatCurrency(144)}</span>
                 </div>
               </div>
               <div className="grid gap-2">

@@ -17,6 +17,7 @@ import { SettingsView } from "@/components/views/settings-view"
 import { ReportsView } from "@/components/views/reports-view"
 import { AuthScreen } from "@/components/auth-screen"
 import { Separator } from "@/components/ui/separator"
+import { ThemeToggle } from "@/components/theme-toggle"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -72,7 +73,8 @@ export default function Page() {
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-2">
+            <ThemeToggle />
             <span className="text-xs text-muted-foreground hidden sm:block">
               {new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short", year: "numeric" }).format(new Date())}
             </span>

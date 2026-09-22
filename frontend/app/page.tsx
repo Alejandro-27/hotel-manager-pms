@@ -7,6 +7,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
+import { LoadingScreen } from "@/components/ui/loading-screen"
 import { DashboardView } from "@/components/views/dashboard-view"
 import { CalendarView } from "@/components/views/calendar-view"
 import { GuestsView } from "@/components/views/guests-view"
@@ -17,6 +18,7 @@ import { SettingsView } from "@/components/views/settings-view"
 import { ReportsView } from "@/components/views/reports-view"
 import { AuthScreen } from "@/components/auth-screen"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { useAuth } from "@/lib/auth-context"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -35,18 +37,16 @@ const viewTitles: Record<string, string> = {
   reports: "Informes y KPIs",
 }
 
-interface AuthUser {
-  name: string
-  email: string
-  role: string
-}
-
 export default function Page() {
   const [activeView, setActiveView] = useState("dashboard")
-  const [user, setUser] = useState<AuthUser | null>(null)
+  const { user, isLoading, logout } = useAuth()
+
+  if (isLoading) {
+    return <LoadingScreen />
+  }
 
   if (!user) {
-    return <AuthScreen onLogin={setUser} />
+    return <AuthScreen />
   }
 
   return (
@@ -56,7 +56,7 @@ export default function Page() {
         onNavigate={setActiveView}
         userName={user.name}
         userEmail={user.email}
-        onLogout={() => setUser(null)}
+        onLogout={logout}
       />
       <SidebarInset>
         {/* Top Bar */}

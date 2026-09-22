@@ -28,7 +28,18 @@ export default fp(async (app) => {
 
   app.decorate('authenticate', async (req: FastifyRequest, reply: FastifyReply) => {
     try {
-      const payload = await req.jwtVerify<AuthUser>()
+      const token =
+        req.cookies?.token ??
+        (req.headers.authorization?.startsWith('Bearer ')
+          ? req.headers.authorization.slice(7)
+          : null)
+
+      if (!token) {
+        reply.code(401).send({ error: 'No autorizado' })
+        return
+      }
+
+      const payload = await app.jwt.verify<AuthUser>(token)
       req.authUser = {
         sub: payload.sub,
         email: payload.email,

@@ -1,9 +1,11 @@
 "use client"
 
-import { useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Button } from "@/components/ui/button"
 import {
   BedDouble,
   DollarSign,
@@ -16,21 +18,10 @@ import {
   Wrench,
   CalendarCheck,
   UtensilsCrossed,
+  RefreshCw,
 } from "lucide-react"
-import {
-  rooms,
-  reservations,
-  sales,
-  getOccupancyRate,
-  getDailyRevenue,
-  getPendingCheckins,
-  getLowStockProducts,
-  monthlyRevenueData,
-  getGuestById,
-  getRoomById,
-  getProductById,
-} from "@/lib/store"
-import type { Product } from "@/lib/types"
+import { api, type DashboardReport, type OccupancyReport, type FinancialReport } from "@/lib/api"
+import type { Guest, Room, Product } from "@/lib/types"
 import { formatCurrency } from "@/lib/utils"
 import {
   ChartContainer,
@@ -52,28 +43,63 @@ const chartConfig = {
 } satisfies ChartConfig
 
 export function DashboardView() {
-  const occupancy = useMemo(() => getOccupancyRate(), [])
-  const dailyRevenue = useMemo(() => getDailyRevenue(), [])
-  const pendingCheckins = useMemo(() => getPendingCheckins(), [])
-  const lowStock = useMemo(() => getLowStockProducts(), [])
+  const [dashboard, setDashboard] = useState<DashboardReport | null>(null)
+  const [occupancy, setOccupancy] = useState<OccupancyReport | null>(null)
+  const [financial, setFinancial] = useState<FinancialReport | null>(null)
+  const [guests, setGuests] = useState<Guest[]>([])
+  const [rooms, setRooms] = useState<Room[]>([])
+  const [products, setProducts] = useState<Product[]>([])
+  const [sales, setSales] = useState<(import("@/lib/types").Sale)[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const stats = useMemo(() => {
-    const byStatus = {
-      libre: rooms.filter((r) => r.status === "libre").length,
-      ocupada: rooms.filter((r) => r.status === "ocupada").length,
-      mantenimiento: rooms.filter((r) => r.status === "mantenimiento").length,
-      limpieza: rooms.filter((r) => r.status === "limpieza").length,
-    }
+  const load = useMemo(
+    () => () => {
+      setLoading(true)
+      setError(null)
+      Promise.all([
+        api.reports.dashboard(),
+        api.reports.occupancy(),
+        api.reports.financial().catch(() => null),
+        api.guests.get(),
+        api.rooms.get(),
+        api.products.get(),
+        api.sales.get(),
+      ])
+        .then(([dash, occ, fin, g, r, p, s]) => {
+          setDashboard(dash)
+          setOccupancy(occ)
+          setFinancial(fin)
+          setGuests(g)
+          setRooms(r)
+          setProducts(p)
+          setSales(s)
+        })
+        .catch((err) => setError(err instanceof Error ? err.message : "Error al cargar los datos"))
+        .finally(() => setLoading(false))
+    },
+    []
+  )
 
-    return { byStatus }
-  }, [])
+  useEffect(() => {
+    load()
+  }, [load])
+
+  const guestMap = useMemo(() => new Map(guests.map((g) => [g.id, g])), [guests])
+  const roomMap = useMemo(() => new Map(rooms.map((r) => [r.id, r])), [rooms])
+
+  const byStatus = useMemo(() => {
+    if (!occupancy) return { libre: 0, ocupada: 0, mantenimiento: 0, limpieza: 0 }
+    const map: Record<string, number> = {}
+    occupancy.byStatus.forEach((s) => { map[s.status] = s.count })
+    return { libre: map.libre ?? 0, ocupada: map.ocupada ?? 0, mantenimiento: map.mantenimiento ?? 0, limpieza: map.limpieza ?? 0 }
+  }, [occupancy])
+
+  const pendingCheckins = dashboard?.pendingCheckins ?? []
 
   const todayReservations = useMemo(
-    () =>
-      reservations
-        .filter((r) => r.checkIn === "2026-02-20" || r.status === "checkin")
-        .slice(0, 5),
-    []
+    () => pendingCheckins.slice(0, 5),
+    [pendingCheckins]
   )
 
   const topProducts = useMemo(() => {
@@ -85,15 +111,44 @@ export function DashboardView() {
     })
     return Object.entries(countMap)
       .map(([id, qty]) => {
-        const product = getProductById(id)
+        const product = products.find((p) => p.id === id)
         return { product, qty }
       })
       .filter((x): x is { product: Product; qty: number } => x.product !== undefined)
       .sort((a, b) => b.qty - a.qty)
       .slice(0, 5)
-  }, [])
+  }, [sales, products])
 
   const maxTopQty = topProducts.length ? topProducts[0].qty : 1
+  const monthlyRevenueData = financial?.monthlyRevenue ?? []
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-56" />
+          <Skeleton className="h-4 w-72" />
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32" />)}
+        </div>
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Skeleton className="h-[350px] lg:col-span-2" />
+          <Skeleton className="h-[350px]" />
+        </div>
+      </div>
+    )
+  }
+
+  if (error && !dashboard) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
+        <AlertTriangle className="size-10 text-destructive" />
+        <p className="text-sm text-muted-foreground">{error}</p>
+        <Button onClick={load}><RefreshCw className="mr-1 size-4" /> Reintentar</Button>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -118,17 +173,17 @@ export function DashboardView() {
                   <circle
                     cx="32" cy="32" r="28" fill="none" strokeWidth="6"
                     className="stroke-primary"
-                    strokeDasharray={`${(occupancy / 100) * 175.93} 175.93`}
+                    strokeDasharray={`${((dashboard?.occupancyRate ?? 0) / 100) * 175.93} 175.93`}
                     strokeLinecap="round"
                   />
                 </svg>
-                <span className="absolute text-sm font-bold text-foreground">{occupancy}%</span>
+                <span className="absolute text-sm font-bold text-foreground">{dashboard?.occupancyRate ?? 0}%</span>
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">{occupancy}%</p>
+                <p className="text-2xl font-bold text-foreground">{dashboard?.occupancyRate ?? 0}%</p>
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
                   <TrendingUp className="size-3 text-emerald-600" />
-                  +5% vs ayer
+                  {occupancy?.occupiedRooms ?? 0}/{occupancy?.totalRooms ?? 0} habitaciones
                 </p>
               </div>
             </div>
@@ -143,14 +198,11 @@ export function DashboardView() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-foreground">
-              {formatCurrency(dailyRevenue)}
+              {formatCurrency(dashboard?.dailyRevenue ?? 0)}
             </p>
             <div className="mt-2 flex gap-2">
               <Badge variant="secondary" className="text-xs">
-                Hospedaje: 85%
-              </Badge>
-              <Badge variant="outline" className="text-xs">
-                Catering: 15%
+                Hospedaje + Catering
               </Badge>
             </div>
           </CardContent>
@@ -166,13 +218,13 @@ export function DashboardView() {
             <p className="text-2xl font-bold text-foreground">{pendingCheckins.length}</p>
             <div className="mt-2 flex flex-col gap-1">
               {pendingCheckins.slice(0, 3).map((r) => {
-                const guest = getGuestById(r.guestId)
-                const room = getRoomById(r.roomId)
+                const guest = guestMap.get(r.guestId)
+                const room = roomMap.get(r.roomId)
                 return (
                   <div key={r.id} className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground truncate">{guest?.name}</span>
+                    <span className="text-muted-foreground truncate">{guest?.name ?? "—"}</span>
                     <Badge variant="outline" className="text-xs shrink-0">
-                      Hab. {room?.number}
+                      Hab. {room?.number ?? "—"}
                     </Badge>
                   </div>
                 )
@@ -188,16 +240,16 @@ export function DashboardView() {
             <AlertTriangle className="size-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-foreground">{lowStock.length}</p>
+            <p className="text-2xl font-bold text-foreground">{dashboard?.lowStockProducts.length ?? 0}</p>
             <div className="mt-2 flex flex-col gap-1.5">
-              {lowStock.slice(0, 3).map((p) => (
+              {(dashboard?.lowStockProducts ?? []).slice(0, 3).map((p) => (
                 <div key={p.id} className="flex items-center gap-2">
                   <div className="flex-1">
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-muted-foreground truncate">{p.name}</span>
                       <span className="text-destructive font-medium shrink-0">{p.currentStock}/{p.minStock}</span>
                     </div>
-                    <Progress value={(p.currentStock / p.minStock) * 100} className="mt-1 h-1.5" />
+                    <Progress value={(p.currentStock / Math.max(p.minStock, 1)) * 100} className="mt-1 h-1.5" />
                   </div>
                 </div>
               ))}
@@ -215,7 +267,7 @@ export function DashboardView() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Habitaciones Libres</p>
-              <p className="text-xl font-bold text-foreground">{stats.byStatus.libre}</p>
+              <p className="text-xl font-bold text-foreground">{byStatus.libre}</p>
             </div>
           </CardContent>
         </Card>
@@ -226,7 +278,7 @@ export function DashboardView() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Habitaciones Ocupadas</p>
-              <p className="text-xl font-bold text-foreground">{stats.byStatus.ocupada}</p>
+              <p className="text-xl font-bold text-foreground">{byStatus.ocupada}</p>
             </div>
           </CardContent>
         </Card>
@@ -237,7 +289,7 @@ export function DashboardView() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">En Limpieza</p>
-              <p className="text-xl font-bold text-foreground">{stats.byStatus.limpieza}</p>
+              <p className="text-xl font-bold text-foreground">{byStatus.limpieza}</p>
             </div>
           </CardContent>
         </Card>
@@ -248,7 +300,7 @@ export function DashboardView() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">En Mantenimiento</p>
-              <p className="text-xl font-bold text-foreground">{stats.byStatus.mantenimiento}</p>
+              <p className="text-xl font-bold text-foreground">{byStatus.mantenimiento}</p>
             </div>
           </CardContent>
         </Card>
@@ -263,27 +315,33 @@ export function DashboardView() {
             <CardDescription>Ultimos 6 meses de actividad financiera</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={chartConfig} className="h-[350px] w-full">
-              <BarChart data={monthlyRevenueData} barGap={4}>
-                <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={8}
-                  tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
-                />
-                <ChartTooltip
-                  content={
-                    <ChartTooltipContent
-                      formatter={(value) => formatCurrency(Number(value))}
-                    />
-                  }
-                />
-                <Bar dataKey="ingresos" fill="var(--color-ingresos)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="gastos" fill="var(--color-gastos)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ChartContainer>
+            {monthlyRevenueData.length > 0 ? (
+              <ChartContainer config={chartConfig} className="h-[350px] w-full">
+                <BarChart data={monthlyRevenueData} barGap={4}>
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                  <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+                  />
+                  <ChartTooltip
+                    content={
+                      <ChartTooltipContent
+                        formatter={(value) => formatCurrency(Number(value))}
+                      />
+                    }
+                  />
+                  <Bar dataKey="ingresos" fill="var(--color-ingresos)" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="gastos" fill="var(--color-gastos)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ChartContainer>
+            ) : (
+              <div className="flex h-[350px] items-center justify-center text-sm text-muted-foreground">
+                Sin datos financieros disponibles
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -293,31 +351,28 @@ export function DashboardView() {
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-foreground text-base">
                 <CalendarCheck className="size-4" />
-                Llegadas de Hoy
+                Check-ins Pendientes
               </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
               {todayReservations.length === 0 && (
-                <p className="text-sm text-muted-foreground">No hay llegadas programadas</p>
+                <p className="text-sm text-muted-foreground">No hay llegadas pendientes</p>
               )}
               {todayReservations.map((r) => {
-                const guest = getGuestById(r.guestId)
-                const room = getRoomById(r.roomId)
-                const isCheckin = r.status === "checkin"
+                const guest = guestMap.get(r.guestId)
+                const room = roomMap.get(r.roomId)
                 return (
                   <div key={r.id} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="flex size-8 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground">
-                        {guest?.name.charAt(0).toUpperCase()}
+                        {guest?.name.charAt(0).toUpperCase() ?? "?"}
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-foreground leading-tight">{guest?.name}</p>
-                        <p className="text-xs text-muted-foreground">Hab. {room?.number}</p>
+                        <p className="text-sm font-medium text-foreground leading-tight">{guest?.name ?? "—"}</p>
+                        <p className="text-xs text-muted-foreground">Hab. {room?.number ?? "—"}</p>
                       </div>
                     </div>
-                    <Badge variant={isCheckin ? "secondary" : "outline"} className="text-[10px]">
-                      {isCheckin ? "Alojado" : "Confirmado"}
-                    </Badge>
+                    <Badge variant="outline" className="text-[10px]">Confirmado</Badge>
                   </div>
                 )
               })}
@@ -332,7 +387,10 @@ export function DashboardView() {
               </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
-              {topProducts.map((t, _i) => (
+              {topProducts.length === 0 && (
+                <p className="text-sm text-muted-foreground">Sin ventas registradas</p>
+              )}
+              {topProducts.map((t) => (
                 <div key={t.product.id}>
                   <div className="flex items-center justify-between text-sm mb-1">
                     <span className="text-foreground truncate">{t.product.name}</span>

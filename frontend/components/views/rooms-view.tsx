@@ -1,11 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Table,
   TableBody,
@@ -37,46 +38,159 @@ import {
   Building2,
   Filter,
   Users,
+  AlertTriangle,
+  RefreshCw,
 } from "lucide-react"
-import { rooms, reservations, getGuestById, type Room, type RoomStatus } from "@/lib/store"
+import { api } from "@/lib/api"
 import { roomStatusConfig as statusConfig, roomTypeLabels as typeLabels } from "@/lib/constants"
 import { formatCurrency } from "@/lib/utils"
+import type { Room, RoomStatus, Reservation, Guest } from "@/lib/types"
+
+interface NewRoomForm {
+  number: string
+  floor: string
+  type: Room["type"]
+  maxCapacity: string
+  pricePerNight: string
+}
+
+const emptyForm: NewRoomForm = { number: "", floor: "1", type: "doble", maxCapacity: "2", pricePerNight: "" }
 
 export function RoomsView() {
   const [filterFloor, setFilterFloor] = useState<string>("all")
   const [filterType, setFilterType] = useState<string>("all")
   const [filterStatus, setFilterStatus] = useState<string>("all")
+  const [rooms, setRooms] = useState<Room[]>([])
+  const [activeReservations, setActiveReservations] = useState<Reservation[]>([])
+  const [guests, setGuests] = useState<Guest[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
   const [editRoom, setEditRoom] = useState<Room | null>(null)
-  const [editStatus, setEditStatus] = useState<string>("")
+  const [editStatus, setEditStatus] = useState<RoomStatus>("libre")
   const [editPrice, setEditPrice] = useState<string>("")
   const [addDialogOpen, setAddDialogOpen] = useState(false)
+  const [newRoom, setNewRoom] = useState<NewRoomForm>(emptyForm)
 
-  const floors = [...new Set(rooms.map((r) => r.floor))].sort()
+  const load = useCallback(() => {
+    setLoading(true)
+    setError(null)
+    Promise.all([
+      api.rooms.get(),
+      api.reservations.get({ status: "checkin" }),
+      api.guests.get(),
+    ])
+      .then(([r, res, g]) => {
+        setRooms(r)
+        setActiveReservations(res)
+        setGuests(g)
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : "Error al cargar habitaciones"))
+      .finally(() => setLoading(false))
+  }, [])
 
-  const filteredRooms = rooms.filter((r) => {
+  useEffect(() => { load() }, [load])
+
+  const guestMap = useMemo(() => new Map(guests.map((g) => [g.id, g])), [guests])
+
+  const floors = useMemo(() => [...new Set(rooms.map((r) => r.floor))].sort(), [rooms])
+
+  const filteredRooms = useMemo(() => rooms.filter((r) => {
     if (filterFloor !== "all" && r.floor !== Number(filterFloor)) return false
     if (filterType !== "all" && r.type !== filterType) return false
     if (filterStatus !== "all" && r.status !== filterStatus) return false
     return true
-  })
+  }), [rooms, filterFloor, filterType, filterStatus])
 
-  const statusCounts = {
-    libre: rooms.filter((r) => r.status === "libre").length,
-    ocupada: rooms.filter((r) => r.status === "ocupada").length,
-    mantenimiento: rooms.filter((r) => r.status === "mantenimiento").length,
-    limpieza: rooms.filter((r) => r.status === "limpieza").length,
-  }
+  const statusCounts = useMemo(() => {
+    const counts: Record<RoomStatus, number> = { libre: 0, ocupada: 0, mantenimiento: 0, limpieza: 0 }
+    rooms.forEach((r) => { counts[r.status] = (counts[r.status] ?? 0) + 1 })
+    return counts
+  }, [rooms])
 
-  function getOccupant(roomId: string) {
-    const res = reservations.find((r) => r.roomId === roomId && r.status === "checkin")
-    if (!res) return null
-    return getGuestById(res.guestId)
-  }
+  const occupantByRoom = useMemo(() => {
+    const map = new Map<string, Guest>()
+    activeReservations.forEach((r) => {
+      if (!map.has(r.roomId)) {
+        const guest = guestMap.get(r.guestId)
+        if (guest) map.set(r.roomId, guest)
+      }
+    })
+    return map
+  }, [activeReservations, guestMap])
 
   function handleOpenEdit(room: Room) {
     setEditRoom(room)
     setEditStatus(room.status)
     setEditPrice(room.pricePerNight.toString())
+  }
+
+  async function handleSaveEdit() {
+    if (!editRoom) return
+    setSaving(true)
+    setError(null)
+    try {
+      const price = Number(editPrice)
+      if (Number.isFinite(price) && price !== editRoom.pricePerNight) {
+        await api.rooms.update(editRoom.id, { pricePerNight: price })
+      }
+      if (editStatus !== editRoom.status) {
+        await api.rooms.updateStatus(editRoom.id, editStatus)
+      }
+      setEditRoom(null)
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al guardar habitacion")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleCreateRoom() {
+    setSaving(true)
+    setError(null)
+    try {
+      await api.rooms.create({
+        number: newRoom.number,
+        floor: Number(newRoom.floor),
+        type: newRoom.type,
+        maxCapacity: Number(newRoom.maxCapacity),
+        pricePerNight: Number(newRoom.pricePerNight),
+      })
+      setAddDialogOpen(false)
+      setNewRoom(emptyForm)
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al crear habitacion")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-60" />
+          <Skeleton className="h-4 w-72" />
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24" />)}
+        </div>
+        <Skeleton className="h-72" />
+      </div>
+    )
+  }
+
+  if (error && rooms.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
+        <AlertTriangle className="size-10 text-destructive" />
+        <p className="text-sm text-muted-foreground">{error}</p>
+        <Button onClick={load}><RefreshCw className="mr-1 size-4" /> Reintentar</Button>
+      </div>
+    )
   }
 
   return (
@@ -91,6 +205,13 @@ export function RoomsView() {
           Nueva Habitacion
         </Button>
       </div>
+
+      {error && (
+        <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+          <AlertTriangle className="size-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
 
       {/* Status Summary */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -150,10 +271,9 @@ export function RoomsView() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="individual">Individual</SelectItem>
-                  <SelectItem value="doble">Doble</SelectItem>
-                  <SelectItem value="suite">Suite</SelectItem>
-                  <SelectItem value="familiar">Familiar</SelectItem>
+                  {(Object.keys(typeLabels) as Room["type"][]).map((t) => (
+                    <SelectItem key={t} value={t}>{typeLabels[t]}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -165,10 +285,9 @@ export function RoomsView() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="libre">Libre</SelectItem>
-                  <SelectItem value="ocupada">Ocupada</SelectItem>
-                  <SelectItem value="mantenimiento">Mantenimiento</SelectItem>
-                  <SelectItem value="limpieza">Limpieza</SelectItem>
+                  {(Object.keys(statusConfig) as RoomStatus[]).map((s) => (
+                    <SelectItem key={s} value={s}>{statusConfig[s].label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -210,9 +329,16 @@ export function RoomsView() {
                 </TableRow>
               </TableHeader>
               <TableBody>
+                {filteredRooms.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-sm text-muted-foreground">
+                      No hay habitaciones que coincidan con los filtros
+                    </TableCell>
+                  </TableRow>
+                )}
                 {filteredRooms.map((room) => {
                   const config = statusConfig[room.status]
-                  const occupant = getOccupant(room.id)
+                  const occupant = occupantByRoom.get(room.id)
                   return (
                     <TableRow key={room.id}>
                       <TableCell>
@@ -305,15 +431,14 @@ export function RoomsView() {
               <div className="grid gap-3">
                 <div>
                   <Label className="text-sm">Estado</Label>
-                  <Select value={editStatus} onValueChange={setEditStatus}>
+                  <Select value={editStatus} onValueChange={(v) => setEditStatus(v as RoomStatus)}>
                     <SelectTrigger className="mt-1">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="libre">Libre</SelectItem>
-                      <SelectItem value="ocupada">Ocupada</SelectItem>
-                      <SelectItem value="mantenimiento">Mantenimiento</SelectItem>
-                      <SelectItem value="limpieza">Limpieza</SelectItem>
+                      {(Object.keys(statusConfig) as RoomStatus[]).map((s) => (
+                        <SelectItem key={s} value={s}>{statusConfig[s].label}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -329,8 +454,10 @@ export function RoomsView() {
               </div>
 
               <DialogFooter>
-                <Button variant="outline" onClick={() => setEditRoom(null)}>Cancelar</Button>
-                <Button onClick={() => setEditRoom(null)}>Guardar Cambios</Button>
+                <Button variant="outline" onClick={() => setEditRoom(null)} disabled={saving}>Cancelar</Button>
+                <Button onClick={handleSaveEdit} disabled={saving}>
+                  {saving ? "Guardando..." : "Guardar Cambios"}
+                </Button>
               </DialogFooter>
             </div>
           )}
@@ -338,7 +465,7 @@ export function RoomsView() {
       </Dialog>
 
       {/* Add Room Dialog */}
-      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+      <Dialog open={addDialogOpen} onOpenChange={(open) => { setAddDialogOpen(open); if (!open) setNewRoom(emptyForm) }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-foreground">Nueva Habitacion</DialogTitle>
@@ -348,42 +475,62 @@ export function RoomsView() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-sm">Numero</Label>
-                <Input placeholder="601" className="mt-1" />
+                <Input
+                  placeholder="601"
+                  className="mt-1"
+                  value={newRoom.number}
+                  onChange={(e) => setNewRoom({ ...newRoom, number: e.target.value })}
+                />
               </div>
               <div>
                 <Label className="text-sm">Planta</Label>
-                <Input type="number" placeholder="6" className="mt-1" />
+                <Input
+                  type="number"
+                  placeholder="6"
+                  className="mt-1"
+                  value={newRoom.floor}
+                  onChange={(e) => setNewRoom({ ...newRoom, floor: e.target.value })}
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-sm">Tipo</Label>
-                <Select defaultValue="doble">
+                <Select value={newRoom.type} onValueChange={(v) => setNewRoom({ ...newRoom, type: v as Room["type"] })}>
                   <SelectTrigger className="mt-1">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="individual">Individual</SelectItem>
-                    <SelectItem value="doble">Doble</SelectItem>
-                    <SelectItem value="suite">Suite</SelectItem>
-                    <SelectItem value="familiar">Familiar</SelectItem>
+                    {(Object.keys(typeLabels) as Room["type"][]).map((t) => (
+                      <SelectItem key={t} value={t}>{typeLabels[t]}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
                 <Label className="text-sm">Capacidad maxima</Label>
-                <Input type="number" defaultValue={2} className="mt-1" />
+                <Input
+                  type="number"
+                  className="mt-1"
+                  value={newRoom.maxCapacity}
+                  onChange={(e) => setNewRoom({ ...newRoom, maxCapacity: e.target.value })}
+                />
               </div>
             </div>
             <div>
               <Label className="text-sm">Tarifa por noche</Label>
-              <Input type="number" placeholder="150.000" className="mt-1" />
+              <Input
+                type="number"
+                placeholder="150"
+                className="mt-1"
+                value={newRoom.pricePerNight}
+                onChange={(e) => setNewRoom({ ...newRoom, pricePerNight: e.target.value })}
+              />
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setAddDialogOpen(false)}>Cancelar</Button>
-              <Button onClick={() => setAddDialogOpen(false)}>
-                <Plus className="mr-1 size-4" />
-                Crear Habitacion
+              <Button variant="outline" onClick={() => setAddDialogOpen(false)} disabled={saving}>Cancelar</Button>
+              <Button onClick={handleCreateRoom} disabled={saving}>
+                {saving ? "Creando..." : (<><Plus className="mr-1 size-4" /> Crear Habitacion</>)}
               </Button>
             </DialogFooter>
           </div>

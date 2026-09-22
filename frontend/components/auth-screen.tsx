@@ -3,23 +3,22 @@
 import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Building2, Eye, EyeOff, ArrowRight, UserPlus, LogIn } from "lucide-react"
+import { Building2, Eye, EyeOff, ArrowRight, UserPlus, LogIn, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { loginSchema, registerSchema, type LoginFormData, type RegisterFormData } from "@/lib/validations"
+import { useAuth } from "@/lib/auth-context"
 
-interface AuthScreenProps {
-  onLogin: (user: { name: string; email: string; role: string }) => void
-}
-
-export function AuthScreen({ onLogin }: AuthScreenProps) {
+export function AuthScreen() {
+  const { login: doLogin, register: doRegister } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loginLoading, setLoginLoading] = useState(false)
   const [registerLoading, setRegisterLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -28,31 +27,31 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
 
   const registerForm = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { name: "", email: "", hotel: "", role: "recepcion", password: "", confirmPassword: "" },
+    defaultValues: { name: "", email: "", hotelName: "", password: "", confirmPassword: "" },
   })
 
-  function handleLogin(data: LoginFormData) {
+  async function handleLogin(data: LoginFormData) {
     setLoginLoading(true)
-    setTimeout(() => {
+    setError(null)
+    try {
+      await doLogin(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al iniciar sesion")
+    } finally {
       setLoginLoading(false)
-      onLogin({
-        name: "Administrador",
-        email: data.email,
-        role: "admin",
-      })
-    }, 800)
+    }
   }
 
-  function handleRegister(data: RegisterFormData) {
+  async function handleRegister(data: RegisterFormData) {
     setRegisterLoading(true)
-    setTimeout(() => {
+    setError(null)
+    try {
+      await doRegister(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al crear la cuenta")
+    } finally {
       setRegisterLoading(false)
-      onLogin({
-        name: data.name,
-        email: data.email,
-        role: data.role,
-      })
-    }, 800)
+    }
   }
 
   return (
@@ -134,6 +133,13 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
                 Crear Cuenta
               </TabsTrigger>
             </TabsList>
+
+            {error && (
+              <div className="mb-4 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
 
             {/* Login Tab */}
             <TabsContent value="login">
@@ -228,14 +234,13 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
                       variant="outline"
                       className="w-full text-foreground"
                       onClick={() => {
-                        onLogin({
-                          name: "Administrador Demo",
-                          email: "demo@hotel.com",
-                          role: "admin",
-                        })
+                        setError(null)
+                        loginForm.setValue("email", "admin@hotel.com")
+                        loginForm.setValue("password", "Admin123!")
+                        loginForm.handleSubmit(handleLogin)()
                       }}
                     >
-                      Entrar como Administrador Demo
+                      Entrar con credenciales demo
                     </Button>
                   </form>
                 </CardContent>
@@ -267,14 +272,14 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
                         )}
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="reg-hotel" className="text-foreground">Nombre del hotel</Label>
+                        <Label htmlFor="reg-hotel" className="text-foreground">Nombre del hotel <span className="text-muted-foreground">(opcional)</span></Label>
                         <Input
                           id="reg-hotel"
                           placeholder="Hotel Sol y Mar"
-                          {...registerForm.register("hotel")}
+                          {...registerForm.register("hotelName")}
                         />
-                        {registerForm.formState.errors.hotel && (
-                          <p className="text-xs text-destructive">{registerForm.formState.errors.hotel.message}</p>
+                        {registerForm.formState.errors.hotelName && (
+                          <p className="text-xs text-destructive">{registerForm.formState.errors.hotelName.message}</p>
                         )}
                       </div>
                     </div>
@@ -293,20 +298,6 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
                       )}
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="reg-role" className="text-foreground">Rol en el hotel</Label>
-                      <select
-                        id="reg-role"
-                        {...registerForm.register("role")}
-                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] text-foreground"
-                      >
-                        <option value="admin">Administrador</option>
-                        <option value="recepcion">Recepcionista</option>
-                        <option value="catering">Catering / TPV</option>
-                        <option value="contabilidad">Contabilidad</option>
-                      </select>
-                    </div>
-
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="reg-password" className="text-foreground">Contrasena</Label>
@@ -314,7 +305,7 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
                           <Input
                             id="reg-password"
                             type={showPassword ? "text" : "password"}
-                            placeholder="Min. 6 caracteres"
+                            placeholder="Min. 8 caracteres"
                             {...registerForm.register("password")}
                             autoComplete="new-password"
                             className="pr-10"

@@ -3,12 +3,12 @@ import { loginSchema, registerSchema, newRoomSchema, reservationSchema } from '.
 
 describe('loginSchema', () => {
   it('validates correct login data', () => {
-    const result = loginSchema.safeParse({ email: 'test@email.com', password: '123456' })
+    const result = loginSchema.safeParse({ email: 'test@email.com', password: '12345678' })
     expect(result.success).toBe(true)
   })
 
   it('rejects invalid email', () => {
-    const result = loginSchema.safeParse({ email: 'invalid', password: '123456' })
+    const result = loginSchema.safeParse({ email: 'invalid', password: '12345678' })
     expect(result.success).toBe(false)
   })
 
@@ -23,10 +23,9 @@ describe('registerSchema', () => {
     const result = registerSchema.safeParse({
       name: 'John Doe',
       email: 'john@email.com',
-      hotel: 'Hotel Test',
-      role: 'admin',
-      password: '123456',
-      confirmPassword: '123456',
+      hotelName: 'Hotel Test',
+      password: '12345678',
+      confirmPassword: '12345678',
     })
     expect(result.success).toBe(true)
   })
@@ -35,10 +34,9 @@ describe('registerSchema', () => {
     const result = registerSchema.safeParse({
       name: 'John Doe',
       email: 'john@email.com',
-      hotel: 'Hotel Test',
-      role: 'admin',
-      password: '123456',
-      confirmPassword: '654321',
+      hotelName: 'Hotel Test',
+      password: '12345678',
+      confirmPassword: '87654321',
     })
     expect(result.success).toBe(false)
   })
@@ -47,12 +45,31 @@ describe('registerSchema', () => {
     const result = registerSchema.safeParse({
       name: 'J',
       email: 'john@email.com',
-      hotel: 'Hotel Test',
-      role: 'admin',
+      hotelName: 'Hotel Test',
+      password: '12345678',
+      confirmPassword: '12345678',
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects short password', () => {
+    const result = registerSchema.safeParse({
+      name: 'John Doe',
+      email: 'john@email.com',
       password: '123456',
       confirmPassword: '123456',
     })
     expect(result.success).toBe(false)
+  })
+
+  it('accepts missing hotelName', () => {
+    const result = registerSchema.safeParse({
+      name: 'John Doe',
+      email: 'john@email.com',
+      password: '12345678',
+      confirmPassword: '12345678',
+    })
+    expect(result.success).toBe(true)
   })
 })
 

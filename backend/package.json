@@ -12,6 +12,7 @@
     "seed": "tsx src/db/seed.ts"
   },
   "dependencies": {
+    "@fastify/cookie": "^11.1.2",
     "@fastify/cors": "^11.0.0",
     "@fastify/jwt": "^10.2.1",
     "@hotel/types": "workspace:*",

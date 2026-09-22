@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 export const loginSchema = z.object({
   email: z.string().email('Introduce un email válido'),
-  password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
+  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
 })
 
 export type LoginFormData = z.infer<typeof loginSchema>
@@ -10,9 +10,8 @@ export type LoginFormData = z.infer<typeof loginSchema>
 export const registerSchema = z.object({
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
   email: z.string().email('Introduce un email válido'),
-  hotel: z.string().min(2, 'Introduce el nombre del hotel'),
-  role: z.enum(['admin', 'recepcion', 'catering', 'contabilidad']),
-  password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
+  hotelName: z.string().optional(),
+  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'Las contraseñas no coinciden',

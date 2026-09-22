@@ -1,5 +1,6 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
+import fastifyCookie from '@fastify/cookie'
 import { type ZodTypeProvider, validatorCompiler, serializerCompiler } from 'fastify-type-provider-zod'
 import authPlugin from './plugins/auth.js'
 import errorHandlerPlugin from './plugins/error-handler.js'
@@ -28,7 +29,10 @@ export function buildApp() {
       }
       cb(new Error('Not allowed by CORS'), false)
     },
+    credentials: true,
   })
+
+  app.register(fastifyCookie)
 
   app.register(errorHandlerPlugin)
   app.register(authPlugin)

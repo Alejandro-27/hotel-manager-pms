@@ -102,13 +102,28 @@ export const api = {
 
   guests: {
     get: (q?: string) => request<Guest[]>(`/api/guests${buildQuery({ q })}`),
+    create: (data: { name: string; document: string; country: string; email: string; phone: string }) =>
+      request<Guest>('/api/guests', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: Partial<Pick<Guest, 'name' | 'document' | 'country' | 'email' | 'phone'>>) =>
+      request<Guest>(`/api/guests/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   },
 
   reservations: {
     get: (params?: { status?: string; roomId?: string; guestId?: string }) =>
       request<Reservation[]>(`/api/reservations${buildQuery(params)}`),
+    create: (data: {
+      guestId: string
+      roomId: string
+      checkIn: string
+      checkOut: string
+      guests: number
+      paymentMethod: Reservation['paymentMethod']
+      advancePayment?: number
+      notes?: string
+    }) => request<Reservation>('/api/reservations', { method: 'POST', body: JSON.stringify(data) }),
     checkin: (id: string) => request<Reservation>(`/api/reservations/${id}/checkin`, { method: 'PATCH' }),
     checkout: (id: string) => request<Reservation>(`/api/reservations/${id}/checkout`, { method: 'PATCH' }),
+    cancel: (id: string) => request<Reservation>(`/api/reservations/${id}/cancel`, { method: 'PATCH' }),
   },
 
   products: {

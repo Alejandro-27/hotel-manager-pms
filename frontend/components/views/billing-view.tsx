@@ -1,9 +1,12 @@
 "use client"
 
-import { useState, useMemo, useRef } from "react"
+import { useState, useCallback, useEffect, useMemo, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
@@ -20,7 +23,15 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Receipt,
   Eye,
@@ -30,15 +41,11 @@ import {
   User,
   BedDouble,
   CalendarDays,
+  AlertCircle,
+  RefreshCw,
 } from "lucide-react"
-import {
-  invoices,
-  getGuestById,
-  getRoomById,
-  getProductById,
-  reservations,
-  type InvoiceStatus,
-} from "@/lib/store"
+import { api } from "@/lib/api"
+import type { Invoice, Guest, Reservation, Room, Product, InvoiceStatus } from "@/lib/types"
 import { formatCurrency } from "@/lib/utils"
 import { InvoiceVoucher } from "@/components/invoice-voucher"
 
@@ -49,30 +56,75 @@ const statusStyles: Record<InvoiceStatus, { label: string; className: string }> 
 }
 
 export function BillingView() {
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [guestsData, setGuestsData] = useState<Guest[]>([])
+  const [reservationsData, setReservationsData] = useState<Reservation[]>([])
+  const [roomsData, setRoomsData] = useState<Room[]>([])
+  const [productsData, setProductsData] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
   const [selectedInvoice, setSelectedInvoice] = useState<string | null>(null)
+  const [payInvoice, setPayInvoice] = useState<Invoice | null>(null)
   const voucherRef = useRef<HTMLDivElement>(null)
+
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [inv, g, r, rm, p] = await Promise.all([
+        api.invoices.get(),
+        api.guests.get(),
+        api.reservations.get(),
+        api.rooms.get(),
+        api.products.get(),
+      ])
+      setInvoices(inv)
+      setGuestsData(g)
+      setReservationsData(r)
+      setRoomsData(rm)
+      setProductsData(p)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al cargar las facturas")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  const guestById = useMemo(() => new Map(guestsData.map((g) => [g.id, g])), [guestsData])
+  const roomById = useMemo(() => new Map(roomsData.map((r) => [r.id, r])), [roomsData])
+  const reservationById = useMemo(() => new Map(reservationsData.map((r) => [r.id, r])), [reservationsData])
+  const productById = useMemo(() => new Map(productsData.map((p) => [p.id, p])), [productsData])
+  const productName = useCallback(
+    (id: string) => productById.get(id)?.name,
+    [productById]
+  )
+
+  const invoice = selectedInvoice ? invoices.find((i) => i.id === selectedInvoice) : null
+  const invoiceGuest = invoice ? guestById.get(invoice.guestId) : null
+  const invoiceReservation = invoice ? reservationById.get(invoice.reservationId) : null
+  const invoiceRoom = invoiceReservation ? roomById.get(invoiceReservation.roomId) : null
+
+  const totalPaid = useMemo(
+    () => invoices.filter((i) => i.status === "pagada").reduce((sum, i) => sum + (i.subtotal - i.totalDue + i.advancePayment), 0),
+    [invoices]
+  )
+  const totalPartial = useMemo(
+    () => invoices.filter((i) => i.status === "parcial").reduce((sum, i) => sum + i.totalDue, 0),
+    [invoices]
+  )
+  const totalPending = useMemo(
+    () => invoices.filter((i) => i.status === "pendiente").reduce((sum, i) => sum + i.totalDue, 0),
+    [invoices]
+  )
 
   function handlePrint() {
     window.print()
   }
-
-  const invoice = selectedInvoice
-    ? invoices.find((i) => i.id === selectedInvoice)
-    : null
-  const invoiceGuest = invoice ? getGuestById(invoice.guestId) : null
-  const invoiceReservation = invoice
-    ? reservations.find((r) => r.id === invoice.reservationId)
-    : null
-  const invoiceRoom = invoiceReservation
-    ? getRoomById(invoiceReservation.roomId)
-    : null
-
-  const totalPaid = useMemo(() =>
-    invoices.filter(i => i.status === "pagada").reduce((sum, i) => sum + i.subtotal, 0), [])
-  const totalPartial = useMemo(() =>
-    invoices.filter(i => i.status === "parcial").reduce((sum, i) => sum + i.totalDue, 0), [])
-  const totalPending = useMemo(() =>
-    invoices.filter(i => i.status === "pendiente").reduce((sum, i) => sum + i.totalDue, 0), [])
 
   return (
     <div className="flex flex-col gap-6">
@@ -80,6 +132,19 @@ export function BillingView() {
         <h1 className="text-2xl font-bold tracking-tight text-foreground">Facturacion y Pagos</h1>
         <p className="text-muted-foreground text-sm">Contabilidad y gestion de facturas</p>
       </div>
+
+      {error && (
+        <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="size-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+          <Button variant="outline" size="sm" onClick={fetchData}>
+            <RefreshCw className="mr-2 size-4" />
+            Reintentar
+          </Button>
+        </div>
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -130,71 +195,93 @@ export function BillingView() {
         </Card>
       </div>
 
-      {/* Invoices Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-foreground">Facturas</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>N Factura</TableHead>
-                  <TableHead>Huesped</TableHead>
-                  <TableHead>Habitacion</TableHead>
-                  <TableHead>Subtotal</TableHead>
-                  <TableHead>Anticipo</TableHead>
-                  <TableHead>Saldo</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {invoices.map((inv) => {
-                  const guest = getGuestById(inv.guestId)
-                  const reservation = reservations.find((r) => r.id === inv.reservationId)
-                  const room = reservation ? getRoomById(reservation.roomId) : null
-                  const style = statusStyles[inv.status]
-                  return (
-                    <TableRow key={inv.id}>
-                      <TableCell className="font-mono font-medium text-foreground">
-                        {inv.id.toUpperCase()}
-                      </TableCell>
-                      <TableCell className="text-foreground">{guest?.name}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">Hab. {room?.number}</Badge>
-                      </TableCell>
-                      <TableCell className="text-foreground">{formatCurrency(inv.subtotal)}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {formatCurrency(inv.advancePayment)}
-                      </TableCell>
-                      <TableCell className="font-semibold text-foreground">
-                        {formatCurrency(inv.totalDue)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={`${style.className} text-xs border-0`}>
-                          {style.label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSelectedInvoice(inv.id)}
-                        >
-                          <Eye className="mr-1 size-3" />
-                          Ver
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
+      {/* Loading / Invoices Table */}
+      {loading ? (
+        <Card className="p-4">
+          <div className="flex flex-col gap-3">
+            <Skeleton className="h-8 w-52" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-2/3" />
           </div>
-        </CardContent>
-      </Card>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-foreground">Facturas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>N Factura</TableHead>
+                    <TableHead>Huesped</TableHead>
+                    <TableHead>Habitacion</TableHead>
+                    <TableHead>Subtotal</TableHead>
+                    <TableHead>Anticipo</TableHead>
+                    <TableHead>Saldo</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {invoices.map((inv) => {
+                    const guest = guestById.get(inv.guestId)
+                    const reservation = reservationById.get(inv.reservationId)
+                    const room = reservation ? roomById.get(reservation.roomId) : null
+                    const style = statusStyles[inv.status]
+                    return (
+                      <TableRow key={inv.id}>
+                        <TableCell className="font-mono font-medium text-foreground">
+                          {inv.id.toUpperCase()}
+                        </TableCell>
+                        <TableCell className="text-foreground">{guest?.name}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">Hab. {room?.number}</Badge>
+                        </TableCell>
+                        <TableCell className="text-foreground">{formatCurrency(inv.subtotal)}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {formatCurrency(inv.advancePayment)}
+                        </TableCell>
+                        <TableCell className="font-semibold text-foreground">
+                          {formatCurrency(inv.totalDue)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={`${style.className} text-xs border-0`}>
+                            {style.label}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSelectedInvoice(inv.id)}
+                          >
+                            <Eye className="mr-1 size-3" />
+                            Ver
+                          </Button>
+                          {inv.status !== "pagada" && inv.totalDue > 0 && (
+                            <Button
+                              size="sm"
+                              className="ml-1"
+                              onClick={() => {
+                                setPayInvoice(inv)
+                              }}
+                            >
+                              Cobrar
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Invoice Detail Dialog */}
       <Dialog open={!!selectedInvoice} onOpenChange={() => setSelectedInvoice(null)}>
@@ -210,7 +297,14 @@ export function BillingView() {
             <>
               {/* Hidden voucher for printing only */}
               <div className="print-only">
-                <InvoiceVoucher ref={voucherRef} invoice={invoice} />
+                <InvoiceVoucher
+                  ref={voucherRef}
+                  invoice={invoice}
+                  guest={invoiceGuest}
+                  reservation={invoiceReservation}
+                  room={invoiceRoom}
+                  productName={productName}
+                />
               </div>
 
               {/* On-screen system view */}
@@ -272,25 +366,22 @@ export function BillingView() {
                               {formatCurrency(invoice.roomNights.nights * invoice.roomNights.pricePerNight)}
                             </TableCell>
                           </TableRow>
-                          {invoice.cateringCharges.map((item, i) => {
-                            const product = getProductById(item.productId)
-                            return (
-                              <TableRow key={i}>
-                                <TableCell className="text-foreground">
-                                  {product?.name ?? "Producto"}
-                                </TableCell>
-                                <TableCell className="text-right text-muted-foreground">
-                                  {item.quantity}
-                                </TableCell>
-                                <TableCell className="text-right text-muted-foreground">
-                                  {formatCurrency(item.unitPrice)}
-                                </TableCell>
-                                <TableCell className="text-right font-medium text-foreground">
-                                  {formatCurrency(item.quantity * item.unitPrice)}
-                                </TableCell>
-                              </TableRow>
-                            )
-                          })}
+                          {invoice.cateringCharges.map((item, i) => (
+                            <TableRow key={i}>
+                              <TableCell className="text-foreground">
+                                {productName(item.productId) ?? "Producto"}
+                              </TableCell>
+                              <TableCell className="text-right text-muted-foreground">
+                                {item.quantity}
+                              </TableCell>
+                              <TableCell className="text-right text-muted-foreground">
+                                {formatCurrency(item.unitPrice)}
+                              </TableCell>
+                              <TableCell className="text-right font-medium text-foreground">
+                                {formatCurrency(item.quantity * item.unitPrice)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
                         </TableBody>
                       </Table>
                     </div>
@@ -329,15 +420,126 @@ export function BillingView() {
                     <Printer className="mr-1 size-3" />
                     Imprimir
                   </Button>
-                  <Button size="sm">
-                    Registrar Pago
-                  </Button>
+                  {invoice.status !== "pagada" && invoice.totalDue > 0 && (
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setPayInvoice(invoice)
+                      }}
+                    >
+                      Registrar Pago
+                    </Button>
+                  )}
                 </div>
               </div>
             </>
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Payment Dialog */}
+      <PaymentDialog
+        invoice={payInvoice}
+        onClose={() => setPayInvoice(null)}
+        onPaid={() => {
+          setPayInvoice(null)
+          setSelectedInvoice(null)
+          fetchData()
+        }}
+      />
     </div>
+  )
+}
+
+// ---------- Payment Dialog ----------
+
+function PaymentDialog({
+  invoice,
+  onClose,
+  onPaid,
+}: {
+  invoice: Invoice | null
+  onClose: () => void
+  onPaid: () => void
+}) {
+  const [amount, setAmount] = useState("")
+  const [paymentMethod, setPaymentMethod] = useState("efectivo")
+  const [error, setError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (invoice) {
+      setAmount(String(invoice.totalDue))
+      setPaymentMethod("efectivo")
+      setError(null)
+    }
+  }, [invoice])
+
+  async function handlePay() {
+    const value = Number(amount)
+    if (!invoice || !value || value <= 0) {
+      setError("Ingresa un monto valido")
+      return
+    }
+    setSubmitting(true)
+    setError(null)
+    try {
+      await api.invoices.pay(invoice.id, { amount: value, paymentMethod: paymentMethod as Reservation['paymentMethod'] })
+      onPaid()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al registrar el pago")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Dialog open={!!invoice} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="text-foreground">Registrar Pago</DialogTitle>
+          <DialogDescription>
+            {invoice && `Factura ${invoice.id.toUpperCase()} — Saldo pendiente: ${formatCurrency(invoice.totalDue)}`}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-2">
+          <div className="grid gap-2">
+            <Label htmlFor="pay-amount">Monto</Label>
+            <Input
+              id="pay-amount"
+              type="number"
+              min="1"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="pay-method">Metodo de pago</Label>
+            <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+              <SelectTrigger id="pay-method">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="efectivo">Efectivo</SelectItem>
+                <SelectItem value="tarjeta">Tarjeta</SelectItem>
+                <SelectItem value="transferencia">Transferencia</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {error && (
+            <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button onClick={handlePay} disabled={submitting}>
+            {submitting ? "Registrando..." : "Confirmar Pago"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

@@ -3,31 +3,25 @@
 import { forwardRef } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import {
-  getGuestById,
-  getRoomById,
-  getProductById,
-  reservations,
-  type Invoice,
-} from "@/lib/store"
+import type { Invoice, Guest, Reservation, Room } from "@/lib/types"
 import { formatCurrency } from "@/lib/utils"
 
 interface InvoiceVoucherProps {
   invoice: Invoice
+  guest: Guest | null | undefined
+  reservation: Reservation | null | undefined
+  room: Room | null | undefined
+  productName: (productId: string) => string | undefined
+}
+
+const statusLabel: Record<string, string> = {
+  pagada: "PAGADA",
+  parcial: "PAGO PARCIAL",
+  pendiente: "PENDIENTE",
 }
 
 export const InvoiceVoucher = forwardRef<HTMLDivElement, InvoiceVoucherProps>(
-  ({ invoice }, ref) => {
-    const guest = getGuestById(invoice.guestId)
-    const reservation = reservations.find((r) => r.id === invoice.reservationId)
-    const room = reservation ? getRoomById(reservation.roomId) : null
-
-    const statusLabel: Record<string, string> = {
-      pagada: "PAGADA",
-      parcial: "PAGO PARCIAL",
-      pendiente: "PENDIENTE",
-    }
-
+  ({ invoice, guest, reservation, room, productName }, ref) => {
     return (
       <div ref={ref} className="voucher-print">
         <div className="voucher-header">
@@ -83,17 +77,14 @@ export const InvoiceVoucher = forwardRef<HTMLDivElement, InvoiceVoucherProps>(
             <span>{formatCurrency(invoice.roomNights.pricePerNight)}</span>
             <span>{formatCurrency(invoice.roomNights.nights * invoice.roomNights.pricePerNight)}</span>
           </div>
-          {invoice.cateringCharges.map((item, i) => {
-            const product = getProductById(item.productId)
-            return (
-              <div key={i} className="voucher-table-row">
-                <span>{product?.name ?? "Producto"}</span>
-                <span>{item.quantity}</span>
-                <span>{formatCurrency(item.unitPrice)}</span>
-                <span>{formatCurrency(item.quantity * item.unitPrice)}</span>
-              </div>
-            )
-          })}
+          {invoice.cateringCharges.map((item, i) => (
+            <div key={i} className="voucher-table-row">
+              <span>{productName(item.productId) ?? "Producto"}</span>
+              <span>{item.quantity}</span>
+              <span>{formatCurrency(item.unitPrice)}</span>
+              <span>{formatCurrency(item.quantity * item.unitPrice)}</span>
+            </div>
+          ))}
         </div>
 
         <Separator className="my-4" />

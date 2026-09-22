@@ -141,6 +141,8 @@ export const api = {
   invoices: {
     get: (params?: { status?: string; guestId?: string }) =>
       request<Invoice[]>(`/api/invoices${buildQuery(params)}`),
+    pay: (id: string, data: { amount: number; paymentMethod?: Reservation['paymentMethod'] }) =>
+      request<Invoice>(`/api/invoices/${id}/pay`, { method: 'POST', body: JSON.stringify(data) }),
   },
 
   reports: {

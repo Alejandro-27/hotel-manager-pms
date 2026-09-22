@@ -1,10 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback, useEffect, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Select,
@@ -22,7 +23,6 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import {
-  TrendingUp,
   BedDouble,
   Users,
   Euro,
@@ -30,11 +30,13 @@ import {
   Calendar,
   Download,
   ArrowUpRight,
-  ArrowDownRight,
   UtensilsCrossed,
-  Clock,
   Star,
   Target,
+  Receipt,
+  AlertCircle,
+  RefreshCw,
+  ShieldAlert,
 } from "lucide-react"
 import {
   ChartContainer,
@@ -42,114 +44,254 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  Line,
-  LineChart,
-  Area,
-  AreaChart,
-  Pie,
-  PieChart,
-  Cell,
-} from "recharts"
-import {
-  rooms,
-  reservations,
-  guests,
-  products,
-  monthlyRevenueData,
-  getGuestById,
-  getRoomById,
-} from "@/lib/store"
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Pie, PieChart, Cell } from "recharts"
+import { api, type FinancialReport, type OccupancyReport } from "@/lib/api"
+import { useAuth } from "@/lib/auth-context"
+import type { Invoice, Reservation, Room, Guest, Product, Sale } from "@/lib/types"
 import { formatCurrency } from "@/lib/utils"
 
-// --- Report Data ---
-const occupancyByMonth = [
-  { month: "Sep", rate: 62 },
-  { month: "Oct", rate: 71 },
-  { month: "Nov", rate: 55 },
-  { month: "Dic", rate: 85 },
-  { month: "Ene", rate: 48 },
-  { month: "Feb", rate: 30 },
-]
+const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+const typeLabels: Record<string, string> = {
+  individual: 'Individual',
+  doble: 'Doble',
+  suite: 'Suite',
+  familiar: 'Familiar',
+}
+const statusLabels: Record<string, string> = {
+  libre: 'Libre',
+  ocupada: 'Ocupada',
+  mantenimiento: 'Mantenimiento',
+  limpieza: 'Limpieza',
+}
+const weekdayNames = ['Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom']
 
-const revenueByRoomType = [
-  { type: "Individual", revenue: 8500, reservations: 15 },
-  { type: "Doble", revenue: 18400, reservations: 22 },
-  { type: "Suite", revenue: 32000, reservations: 12 },
-  { type: "Familiar", revenue: 21600, reservations: 10 },
-]
+function nightsBetween(checkIn: string, checkOut: string): number {
+  return Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 86400000)
+}
 
-const cateringByCategory = [
-  { name: "Desayunos", value: 12400, fill: "var(--chart-1)" },
-  { name: "Snacks", value: 6800, fill: "var(--chart-2)" },
-  { name: "Bebidas", value: 9200, fill: "var(--chart-3)" },
-]
-
-const guestsByCountry = [
-  { country: "ES", name: "Espana", guests: 32, percent: 40 },
-  { country: "FR", name: "Francia", guests: 14, percent: 18 },
-  { country: "US", name: "Estados Unidos", guests: 12, percent: 15 },
-  { country: "DE", name: "Alemania", guests: 10, percent: 13 },
-  { country: "IT", name: "Italia", guests: 7, percent: 9 },
-  { country: "JP", name: "Japon", guests: 4, percent: 5 },
-]
-
-const dailySales = [
-  { day: "Lun", amount: 340 },
-  { day: "Mar", amount: 280 },
-  { day: "Mie", amount: 520 },
-  { day: "Jue", amount: 410 },
-  { day: "Vie", amount: 680 },
-  { day: "Sab", amount: 890 },
-  { day: "Dom", amount: 720 },
-]
-
-const avgStayData = [
-  { month: "Sep", nights: 3.2 },
-  { month: "Oct", nights: 2.8 },
-  { month: "Nov", nights: 3.5 },
-  { month: "Dic", nights: 4.1 },
-  { month: "Ene", nights: 2.6 },
-  { month: "Feb", nights: 3.8 },
-]
-
-const occupancyConfig = {
-  rate: { label: "Ocupacion %", color: "var(--chart-1)" },
-} satisfies ChartConfig
+function monthlyFromInvoices(inv: Invoice[]): { month: string; ingresos: number; gastos: number }[] {
+  const byMonth: Record<string, number> = {}
+  for (const i of inv) {
+    const key = i.date.slice(0, 7)
+    byMonth[key] = (byMonth[key] ?? 0) + i.subtotal
+  }
+  const result: { month: string; ingresos: number; gastos: number }[] = []
+  const now = new Date()
+  for (let off = 5; off >= 0; off--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - off, 1)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    result.push({ month: monthNames[d.getMonth()], ingresos: byMonth[key] ?? 0, gastos: 0 })
+  }
+  return result
+}
 
 const revenueConfig = {
   ingresos: { label: "Ingresos", color: "var(--chart-1)" },
   gastos: { label: "Gastos", color: "var(--chart-2)" },
 } satisfies ChartConfig
 
+const statusConfig = {
+  libre: { label: "Libre", color: "var(--chart-2)" },
+  ocupada: { label: "Ocupada", color: "var(--chart-1)" },
+  mantenimiento: { label: "Mantenimiento", color: "var(--chart-3)" },
+  limpieza: { label: "Limpieza", color: "var(--chart-4)" },
+} satisfies ChartConfig
+
 const salesConfig = {
   amount: { label: "Ventas", color: "var(--chart-3)" },
 } satisfies ChartConfig
 
-const stayConfig = {
-  nights: { label: "Noches", color: "var(--chart-4)" },
-} satisfies ChartConfig
-
 const pieConfig = {
-  Desayunos: { label: "Desayunos", color: "var(--chart-1)" },
-  Snacks: { label: "Snacks", color: "var(--chart-2)" },
-  Bebidas: { label: "Bebidas", color: "var(--chart-3)" },
+  desayunos: { label: "Desayunos", color: "var(--chart-1)" },
+  snacks: { label: "Snacks", color: "var(--chart-2)" },
+  bebidas: { label: "Bebidas", color: "var(--chart-3)" },
 } satisfies ChartConfig
 
 export function ReportsView() {
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const [period, setPeriod] = useState("6m")
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const totalRevenue = monthlyRevenueData.reduce((s, m) => s + m.ingresos, 0)
-  const totalExpenses = monthlyRevenueData.reduce((s, m) => s + m.gastos, 0)
+  const [rooms, setRooms] = useState<Room[]>([])
+  const [guests, setGuests] = useState<Guest[]>([])
+  const [reservations, setReservations] = useState<Reservation[]>([])
+  const [products, setProducts] = useState<Product[]>([])
+  const [sales, setSales] = useState<Sale[]>([])
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [financial, setFinancial] = useState<FinancialReport | null>(null)
+  const [occupancy, setOccupancy] = useState<OccupancyReport | null>(null)
+
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const base = Promise.all([
+        api.rooms.get(),
+        api.guests.get(),
+        api.reservations.get(),
+        api.products.get(),
+        api.sales.get(),
+        api.invoices.get(),
+        api.reports.occupancy(),
+        isAdmin ? api.reports.financial() : Promise.resolve(null),
+      ])
+      const [r, g, res, p, s, inv, occ, fin] = await base
+      setRooms(r)
+      setGuests(g)
+      setReservations(res)
+      setProducts(p)
+      setSales(s)
+      setInvoices(inv)
+      setOccupancy(occ)
+      setFinancial(fin)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al cargar los informes")
+    } finally {
+      setLoading(false)
+    }
+  }, [isAdmin])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  const monthlyRevenue = useMemo(
+    () => financial?.monthlyRevenue ?? monthlyFromInvoices(invoices),
+    [financial, invoices]
+  )
+  const totalRevenue = useMemo(
+    () => financial?.totalRevenue ?? invoices.reduce((s, i) => s + i.subtotal, 0),
+    [financial, invoices]
+  )
+  const totalExpenses = useMemo(
+    () => monthlyRevenue.reduce((s, m) => s + m.gastos, 0),
+    [monthlyRevenue]
+  )
   const netProfit = totalRevenue - totalExpenses
-  const avgOccupancy = Math.round(occupancyByMonth.reduce((s, m) => s + m.rate, 0) / occupancyByMonth.length)
-  const totalGuests = guests.length
-  const avgRevPerRoom = Math.round(totalRevenue / rooms.length)
+  const avgOccupancy = occupancy?.rate ?? 0
+  const revPerRoom = useMemo(() => (rooms.length ? Math.round(totalRevenue / rooms.length) : 0), [totalRevenue, rooms.length])
+
+  const roomById = useMemo(() => new Map(rooms.map((r) => [r.id, r])), [rooms])
+  const reservationById = useMemo(() => new Map(reservations.map((r) => [r.id, r])), [reservations])
+
+  // Ingresos por tipo de habitacion (desde facturas + reservas + habitaciones)
+  const revenueByRoomType = useMemo(() => {
+    const agg = new Map<string, { revenue: number; reservations: number }>()
+    for (const inv of invoices) {
+      const res = reservationById.get(inv.reservationId)
+      const room = res ? roomById.get(res.roomId) : null
+      const type = room?.type ?? 'individual'
+      const entry = agg.get(type) ?? { revenue: 0, reservations: 0 }
+      entry.revenue += inv.roomNights.nights * inv.roomNights.pricePerNight
+      entry.reservations += 1
+      agg.set(type, entry)
+    }
+    return [...agg.entries()].map(([type, v]) => ({ type, ...v }))
+  }, [invoices, reservationById, roomById])
+
+  // Catering: ventas por categoria y productos top
+  const cateringByCategory = useMemo(() => {
+    const productById = new Map(products.map((p) => [p.id, p]))
+    const agg = new Map<string, number>()
+    for (const s of sales) {
+      for (const item of s.items) {
+        const cat = productById.get(item.productId)?.category ?? 'snacks'
+        agg.set(cat, (agg.get(cat) ?? 0) + item.quantity * item.unitPrice)
+      }
+    }
+    return ['desayunos', 'snacks', 'bebidas'].map((cat) => ({
+      name: cat,
+      value: agg.get(cat) ?? 0,
+      fill: `var(--chart-${['desayunos', 'snacks', 'bebidas'].indexOf(cat) + 1})`,
+    }))
+  }, [sales, products])
+
+  const dailySales = useMemo(() => {
+    const byDay = new Array(7).fill(0)
+    for (const s of sales) {
+      const day = (new Date(s.date + 'T00:00:00').getDay() + 6) % 7 // Lun=0
+      byDay[day] += s.total
+    }
+    return weekdayNames.map((day, i) => ({ day, amount: Math.round(byDay[i] * 100) / 100 }))
+  }, [sales])
+
+  const topProducts = useMemo(() => {
+    const productById = new Map(products.map((p) => [p.id, p]))
+    const agg = new Map<string, { qty: number; revenue: number }>()
+    for (const s of sales) {
+      for (const item of s.items) {
+        const entry = agg.get(item.productId) ?? { qty: 0, revenue: 0 }
+        entry.qty += item.quantity
+        entry.revenue += item.quantity * item.unitPrice
+        agg.set(item.productId, entry)
+      }
+    }
+    return [...agg.entries()]
+      .map(([id, v]) => ({ product: productById.get(id)!, qty: v.qty, revenue: v.revenue }))
+      .filter((e) => e.product)
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 8)
+  }, [sales, products])
+
+  const guestsByCountry = useMemo(() => {
+    const agg = new Map<string, number>()
+    for (const g of guests) {
+      agg.set(g.country, (agg.get(g.country) ?? 0) + 1)
+    }
+    const total = guests.length || 1
+    return [...agg.entries()]
+      .map(([country, count]) => ({ country, count, percent: Math.round((count / total) * 100) }))
+      .sort((a, b) => b.count - a.count)
+  }, [guests])
+
+  const avgNights = useMemo(() => {
+    const valid = reservations.filter((r) => r.checkIn && r.checkOut)
+    if (!valid.length) return 0
+    return Math.round((valid.reduce((s, r) => s + nightsBetween(r.checkIn, r.checkOut), 0) / valid.length) * 10) / 10
+  }, [reservations])
+
+  const occupancyByType = useMemo(
+    () =>
+      (occupancy?.byType ?? []).map((t) => ({
+        type: t.type,
+        rate: t.total ? Math.round((t.occupied / t.total) * 100) : 0,
+        occupied: t.occupied,
+        total: t.total,
+      })),
+    [occupancy]
+  )
+
+  const occupancyByStatus = useMemo(() => {
+    const map = new Map((occupancy?.byStatus ?? []).map((s) => [s.status, s.count]))
+    return ['libre', 'ocupada', 'mantenimiento', 'limpieza']
+      .filter((status) => (map.get(status) ?? 0) > 0)
+      .map((status) => ({ name: statusLabels[status] ?? status, count: map.get(status) ?? 0, fill: `var(--color-${status})` }))
+  }, [occupancy])
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Informes y KPIs</h1>
+          <p className="text-muted-foreground text-sm">Metricas de rendimiento y analisis del hotel</p>
+        </div>
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => (
+            <Card key={i}>
+              <CardContent className="pt-5 pb-4">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="mt-3 h-7 w-32" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <Skeleton className="h-10 w-72" />
+        <Skeleton className="h-[300px] w-full" />
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -178,6 +320,19 @@ export function ReportsView() {
         </div>
       </div>
 
+      {error && (
+        <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="size-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+          <Button variant="outline" size="sm" onClick={fetchData}>
+            <RefreshCw className="mr-2 size-4" />
+            Reintentar
+          </Button>
+        </div>
+      )}
+
       {/* Top-level KPIs */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Card>
@@ -191,8 +346,7 @@ export function ReportsView() {
             <p className="text-xl font-bold text-foreground">{formatCurrency(totalRevenue)}</p>
             <div className="flex items-center gap-1 mt-1">
               <ArrowUpRight className="size-3 text-emerald-600" />
-              <span className="text-xs text-emerald-600 font-medium">+12.5%</span>
-              <span className="text-xs text-muted-foreground">vs periodo anterior</span>
+              <span className="text-xs text-muted-foreground">{invoices.length} facturas emitidas</span>
             </div>
           </CardContent>
         </Card>
@@ -206,9 +360,9 @@ export function ReportsView() {
             </div>
             <p className="text-xl font-bold text-foreground">{formatCurrency(netProfit)}</p>
             <div className="flex items-center gap-1 mt-1">
-              <ArrowUpRight className="size-3 text-emerald-600" />
-              <span className="text-xs text-emerald-600 font-medium">+8.3%</span>
-              <span className="text-xs text-muted-foreground">margen: {Math.round((netProfit / totalRevenue) * 100)}%</span>
+              <span className="text-xs text-muted-foreground">
+                margen: {totalRevenue > 0 ? Math.round((netProfit / totalRevenue) * 100) : 0}%
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -222,9 +376,9 @@ export function ReportsView() {
             </div>
             <p className="text-xl font-bold text-foreground">{avgOccupancy}%</p>
             <div className="flex items-center gap-1 mt-1">
-              <ArrowDownRight className="size-3 text-red-500" />
-              <span className="text-xs text-red-500 font-medium">-3.2%</span>
-              <span className="text-xs text-muted-foreground">vs periodo anterior</span>
+              <span className="text-xs text-muted-foreground">
+                {occupancy?.occupiedRooms ?? 0}/{occupancy?.totalRooms ?? rooms.length} habitaciones
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -236,17 +390,15 @@ export function ReportsView() {
                 <Target className="size-3.5 text-sky-700" />
               </div>
             </div>
-            <p className="text-xl font-bold text-foreground">{formatCurrency(avgRevPerRoom)}</p>
+            <p className="text-xl font-bold text-foreground">{formatCurrency(revPerRoom)}</p>
             <div className="flex items-center gap-1 mt-1">
-              <ArrowUpRight className="size-3 text-emerald-600" />
-              <span className="text-xs text-emerald-600 font-medium">+5.1%</span>
-              <span className="text-xs text-muted-foreground">por habitacion</span>
+              <span className="text-xs text-muted-foreground">ingreso por habitacion</span>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <Tabs defaultValue="financial">
+      <Tabs defaultValue={isAdmin ? "financial" : "occupancy"}>
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="financial" className="gap-1.5">
             <Euro className="size-3.5" />
@@ -266,134 +418,149 @@ export function ReportsView() {
           </TabsTrigger>
         </TabsList>
 
-        {/* Financial Tab */}
         <TabsContent value="financial" className="mt-4 flex flex-col gap-6">
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-foreground">Ingresos vs Gastos</CardTitle>
-                <CardDescription>Comparativa mensual de finanzas</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ChartContainer config={revenueConfig} className="h-[280px] w-full">
-                  <BarChart data={monthlyRevenueData} barGap={4}>
-                    <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                    <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
-                    <YAxis tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                    <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />} />
-                    <Bar dataKey="ingresos" fill="var(--color-ingresos)" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="gastos" fill="var(--color-gastos)" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ChartContainer>
-              </CardContent>
-            </Card>
+          {!isAdmin && (
+            <div className="flex items-center gap-2 rounded-md border border-amber-300/40 bg-amber-50 p-4 text-sm text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+              <ShieldAlert className="size-4 shrink-0" />
+              Los datos financieros detallados solo estan disponibles para administradores.
+            </div>
+          )}
+          {isAdmin && (
+            <>
+              <div className="grid gap-6 lg:grid-cols-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-foreground">Ingresos vs Gastos</CardTitle>
+                    <CardDescription>Comparativa mensual de finanzas</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ChartContainer config={revenueConfig} className="h-[280px] w-full">
+                      <BarChart data={monthlyRevenue} barGap={4}>
+                        <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                        <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
+                        <YAxis tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                        <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />} />
+                        <Bar dataKey="ingresos" fill="var(--color-ingresos)" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="gastos" fill="var(--color-gastos)" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ChartContainer>
+                  </CardContent>
+                </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-foreground">Ingresos por Tipo de Habitacion</CardTitle>
-                <CardDescription>Desglose de facturacion por categoria</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col gap-4">
-                  {revenueByRoomType.map((item) => {
-                    const maxRevenue = Math.max(...revenueByRoomType.map((r) => r.revenue))
-                    return (
-                      <div key={item.type} className="flex flex-col gap-1.5">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-foreground">{item.type}</span>
-                            <Badge variant="secondary" className="text-[10px]">{item.reservations} reservas</Badge>
-                          </div>
-                          <span className="text-sm font-semibold text-foreground">{formatCurrency(item.revenue)}</span>
-                        </div>
-                        <Progress value={(item.revenue / maxRevenue) * 100} className="h-2" />
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-foreground">Ingresos por Tipo de Habitacion</CardTitle>
+                    <CardDescription>Facturacion de alojamiento por categoria</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {revenueByRoomType.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Sin datos para este periodo</p>
+                    ) : (
+                      <div className="flex flex-col gap-4">
+                        {revenueByRoomType.map((item) => {
+                          const maxRevenue = Math.max(...revenueByRoomType.map((r) => r.revenue))
+                          return (
+                            <div key={item.type} className="flex flex-col gap-1.5">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-medium text-foreground">{typeLabels[item.type] ?? item.type}</span>
+                                  <Badge variant="secondary" className="text-[10px]">{item.reservations} reservas</Badge>
+                                </div>
+                                <span className="text-sm font-semibold text-foreground">{formatCurrency(item.revenue)}</span>
+                              </div>
+                              <Progress value={maxRevenue ? (item.revenue / maxRevenue) * 100 : 0} className="h-2" />
+                            </div>
+                          )
+                        })}
                       </div>
-                    )
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
 
-          {/* Financial Summary Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-foreground">Resumen Financiero Mensual</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Mes</TableHead>
-                    <TableHead className="text-right">Ingresos</TableHead>
-                    <TableHead className="text-right">Gastos</TableHead>
-                    <TableHead className="text-right">Beneficio</TableHead>
-                    <TableHead className="text-right">Margen</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {monthlyRevenueData.map((m) => {
-                    const profit = m.ingresos - m.gastos
-                    const margin = Math.round((profit / m.ingresos) * 100)
-                    return (
-                      <TableRow key={m.month}>
-                        <TableCell className="font-medium text-foreground">{m.month}</TableCell>
-                        <TableCell className="text-right text-foreground">{formatCurrency(m.ingresos)}</TableCell>
-                        <TableCell className="text-right text-muted-foreground">{formatCurrency(m.gastos)}</TableCell>
-                        <TableCell className="text-right font-semibold text-emerald-700">{formatCurrency(profit)}</TableCell>
-                        <TableCell className="text-right">
-                          <Badge className="bg-emerald-100 text-emerald-800 border-0 text-xs">{margin}%</Badge>
-                        </TableCell>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-foreground">Resumen Financiero Mensual</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Mes</TableHead>
+                        <TableHead className="text-right">Ingresos</TableHead>
+                        <TableHead className="text-right">Gastos</TableHead>
+                        <TableHead className="text-right">Beneficio</TableHead>
+                        <TableHead className="text-right">Margen</TableHead>
                       </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                    </TableHeader>
+                    <TableBody>
+                      {monthlyRevenue.map((m) => {
+                        const profit = m.ingresos - m.gastos
+                        const margin = m.ingresos > 0 ? Math.round((profit / m.ingresos) * 100) : 0
+                        return (
+                          <TableRow key={m.month}>
+                            <TableCell className="font-medium text-foreground">{m.month}</TableCell>
+                            <TableCell className="text-right text-foreground">{formatCurrency(m.ingresos)}</TableCell>
+                            <TableCell className="text-right text-muted-foreground">{formatCurrency(m.gastos)}</TableCell>
+                            <TableCell className="text-right font-semibold text-emerald-700">{formatCurrency(profit)}</TableCell>
+                            <TableCell className="text-right">
+                              <Badge className="bg-emerald-100 text-emerald-800 border-0 text-xs">{margin}%</Badge>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </TabsContent>
 
-        {/* Occupancy Tab */}
         <TabsContent value="occupancy" className="mt-4 flex flex-col gap-6">
           <div className="grid gap-6 lg:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle className="text-foreground">Evolucion de la Ocupacion</CardTitle>
-                <CardDescription>Porcentaje mensual de ocupacion</CardDescription>
+                <CardTitle className="text-foreground">Ocupacion por Tipo</CardTitle>
+                <CardDescription>Habitaciones ocupadas por categoria</CardDescription>
               </CardHeader>
               <CardContent>
-                <ChartContainer config={occupancyConfig} className="h-[280px] w-full">
-                  <AreaChart data={occupancyByMonth}>
-                    <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                    <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
-                    <YAxis tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(v) => `${v}%`} domain={[0, 100]} />
-                    <ChartTooltip content={<ChartTooltipContent formatter={(value) => `${value}%`} />} />
-                    <defs>
-                      <linearGradient id="fillOcc" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="var(--color-rate)" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="var(--color-rate)" stopOpacity={0.05} />
-                      </linearGradient>
-                    </defs>
-                    <Area type="monotone" dataKey="rate" fill="url(#fillOcc)" stroke="var(--color-rate)" strokeWidth={2} />
-                  </AreaChart>
-                </ChartContainer>
+                {occupancyByType.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Sin datos de ocupacion</p>
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    {occupancyByType.map((t) => (
+                      <div key={t.type} className="flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-foreground capitalize">{typeLabels[t.type] ?? t.type}</span>
+                          <span className="text-sm text-muted-foreground">{t.occupied}/{t.total} ({t.rate}%)</span>
+                        </div>
+                        <Progress value={t.rate} className="h-2" />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-foreground">Estancia Media</CardTitle>
-                <CardDescription>Promedio de noches por reserva</CardDescription>
+                <CardTitle className="text-foreground">Estado de Habitaciones</CardTitle>
+                <CardDescription>Distribucion actual de la flota</CardDescription>
               </CardHeader>
               <CardContent>
-                <ChartContainer config={stayConfig} className="h-[280px] w-full">
-                  <LineChart data={avgStayData}>
+                <ChartContainer config={statusConfig} className="h-[280px] w-full">
+                  <BarChart data={occupancyByStatus}>
                     <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                    <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
-                    <YAxis tickLine={false} axisLine={false} tickMargin={8} domain={[0, 5]} />
-                    <ChartTooltip content={<ChartTooltipContent formatter={(value) => `${value} noches`} />} />
-                    <Line type="monotone" dataKey="nights" stroke="var(--color-nights)" strokeWidth={2} dot={{ r: 4 }} />
-                  </LineChart>
+                    <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} />
+                    <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                      {occupancyByStatus.map((entry, idx) => (
+                        <Cell key={idx} fill={entry.fill} />
+                      ))}
+                    </Bar>
+                  </BarChart>
                 </ChartContainer>
               </CardContent>
             </Card>
@@ -403,7 +570,7 @@ export function ReportsView() {
           <Card>
             <CardHeader>
               <CardTitle className="text-foreground">Rendimiento por Habitacion</CardTitle>
-              <CardDescription>Ocupacion y ingresos por habitacion (top 10)</CardDescription>
+              <CardDescription>Reservas e ingresos estimados por habitacion</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
@@ -413,14 +580,13 @@ export function ReportsView() {
                     <TableHead>Tipo</TableHead>
                     <TableHead>Tarifa</TableHead>
                     <TableHead>Reservas</TableHead>
-                    <TableHead>Ocupacion</TableHead>
+                    <TableHead>Estado</TableHead>
                     <TableHead className="text-right">Ingresos Est.</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {rooms.slice(0, 10).map((room) => {
-                    const roomRes = reservations.filter((r) => r.roomId === room.id)
-                    const occupancy = Math.min(100, roomRes.length * 20)
+                    const roomRes = reservations.filter((r) => r.roomId === room.id && r.status !== 'cancelada')
                     const estRevenue = roomRes.reduce((s, r) => s + r.totalAmount, 0)
                     return (
                       <TableRow key={room.id}>
@@ -431,15 +597,14 @@ export function ReportsView() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="text-xs capitalize">{room.type}</Badge>
+                          <Badge variant="outline" className="text-xs capitalize">{typeLabels[room.type] ?? room.type}</Badge>
                         </TableCell>
                         <TableCell className="text-muted-foreground">{formatCurrency(room.pricePerNight)}/n</TableCell>
                         <TableCell className="text-foreground">{roomRes.length}</TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Progress value={occupancy} className="h-1.5 w-16" />
-                            <span className="text-xs text-muted-foreground">{occupancy}%</span>
-                          </div>
+                          <Badge className={`text-xs border-0 ${room.status === 'ocupada' ? 'bg-emerald-100 text-emerald-800' : room.status === 'mantenimiento' ? 'bg-amber-100 text-amber-800' : room.status === 'limpieza' ? 'bg-sky-100 text-sky-800' : 'bg-muted text-muted-foreground'}`}>
+                            {statusLabels[room.status] ?? room.status}
+                          </Badge>
                         </TableCell>
                         <TableCell className="text-right font-medium text-foreground">{formatCurrency(estRevenue)}</TableCell>
                       </TableRow>
@@ -451,7 +616,6 @@ export function ReportsView() {
           </Card>
         </TabsContent>
 
-        {/* Catering Tab */}
         <TabsContent value="catering" className="mt-4 flex flex-col gap-6">
           <div className="grid gap-6 lg:grid-cols-2">
             <Card>
@@ -477,7 +641,7 @@ export function ReportsView() {
                     <div key={cat.name} className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <div className="size-3 rounded-full" style={{ backgroundColor: cat.fill }} />
-                        <span className="text-sm text-foreground">{cat.name}</span>
+                        <span className="text-sm text-foreground capitalize">{cat.name}</span>
                       </div>
                       <span className="text-sm font-medium text-foreground">{formatCurrency(cat.value)}</span>
                     </div>
@@ -488,8 +652,8 @@ export function ReportsView() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-foreground">Ventas Diarias de la Semana</CardTitle>
-                <CardDescription>Volumen de ventas por dia</CardDescription>
+                <CardTitle className="text-foreground">Ventas por Dia de la Semana</CardTitle>
+                <CardDescription>Volumen de ventas acumulado por dia</CardDescription>
               </CardHeader>
               <CardContent>
                 <ChartContainer config={salesConfig} className="h-[280px] w-full">
@@ -524,38 +688,41 @@ export function ReportsView() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {products.slice(0, 8).map((product, i) => {
-                    const unitsSold = [38, 32, 28, 25, 22, 18, 15, 12][i] ?? 10
-                    return (
-                      <TableRow key={product.id}>
-                        <TableCell>
-                          {i < 3 ? (
-                            <Badge className="bg-amber-100 text-amber-800 border-0 text-xs size-6 flex items-center justify-center">
-                              {i + 1}
-                            </Badge>
-                          ) : (
-                            <span className="text-sm text-muted-foreground ml-1.5">{i + 1}</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="font-medium text-foreground">{product.name}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-xs capitalize">{product.category}</Badge>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">{formatCurrency(product.price)}</TableCell>
-                        <TableCell className="text-foreground">{unitsSold}</TableCell>
-                        <TableCell className="text-right font-medium text-foreground">
-                          {formatCurrency(product.price * unitsSold)}
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
+                  {topProducts.map(({ product, qty, revenue }, i) => (
+                    <TableRow key={product.id}>
+                      <TableCell>
+                        {i < 3 ? (
+                          <Badge className="bg-amber-100 text-amber-800 border-0 text-xs size-6 flex items-center justify-center">
+                            {i + 1}
+                          </Badge>
+                        ) : (
+                          <span className="text-sm text-muted-foreground ml-1.5">{i + 1}</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="font-medium text-foreground">{product.name}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs capitalize">{product.category}</Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{formatCurrency(product.price)}</TableCell>
+                      <TableCell className="text-foreground">{qty}</TableCell>
+                      <TableCell className="text-right font-medium text-foreground">
+                        {formatCurrency(revenue)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {topProducts.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-muted-foreground">
+                        Sin ventas registradas
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* Guests Tab */}
         <TabsContent value="guests" className="mt-4 flex flex-col gap-6">
           <div className="grid gap-6 lg:grid-cols-2">
             <Card>
@@ -564,60 +731,64 @@ export function ReportsView() {
                 <CardDescription>Distribucion de la nacionalidad de los huespedes</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-col gap-3">
-                  {guestsByCountry.map((c) => (
-                    <div key={c.country} className="flex items-center gap-3">
-                      <Badge variant="outline" className="text-xs w-8 justify-center shrink-0">{c.country}</Badge>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm text-foreground">{c.name}</span>
-                          <span className="text-xs text-muted-foreground">{c.guests} huespedes ({c.percent}%)</span>
+                {guestsByCountry.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Sin huespedes registrados</p>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    {guestsByCountry.slice(0, 6).map((c) => (
+                      <div key={c.country} className="flex items-center gap-3">
+                        <Badge variant="outline" className="text-xs w-8 justify-center shrink-0">{c.country}</Badge>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm text-foreground">{c.country}</span>
+                            <span className="text-xs text-muted-foreground">{c.count} huespedes ({c.percent}%)</span>
+                          </div>
+                          <Progress value={c.percent} className="h-2" />
                         </div>
-                        <Progress value={c.percent} className="h-2" />
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
                 <CardTitle className="text-foreground">Metricas de Huespedes</CardTitle>
-                <CardDescription>Estadisticas clave sobre huespedes</CardDescription>
+                <CardDescription>Estadisticas clave del alojamiento</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="rounded-md border p-4 text-center">
                     <Users className="size-5 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-2xl font-bold text-foreground">{totalGuests}</p>
+                    <p className="text-2xl font-bold text-foreground">{guests.length}</p>
                     <p className="text-xs text-muted-foreground">Total Huespedes</p>
                   </div>
                   <div className="rounded-md border p-4 text-center">
-                    <Star className="size-5 text-amber-500 mx-auto mb-2" />
-                    <p className="text-2xl font-bold text-foreground">4.6</p>
-                    <p className="text-xs text-muted-foreground">Valoracion Media</p>
+                    <BedDouble className="size-5 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-2xl font-bold text-foreground">{rooms.length}</p>
+                    <p className="text-xs text-muted-foreground">Habitaciones</p>
                   </div>
                   <div className="rounded-md border p-4 text-center">
-                    <Clock className="size-5 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-2xl font-bold text-foreground">3.4</p>
+                    <Star className="size-5 text-amber-500 mx-auto mb-2" />
+                    <p className="text-2xl font-bold text-foreground">{avgNights}</p>
                     <p className="text-xs text-muted-foreground">Noches Promedio</p>
                   </div>
                   <div className="rounded-md border p-4 text-center">
-                    <TrendingUp className="size-5 text-emerald-600 mx-auto mb-2" />
-                    <p className="text-2xl font-bold text-foreground">22%</p>
-                    <p className="text-xs text-muted-foreground">Tasa de Repeticion</p>
+                    <Receipt className="size-5 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-2xl font-bold text-foreground">{invoices.length}</p>
+                    <p className="text-xs text-muted-foreground">Facturas</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Recent Guests Table */}
+          {/* Reservations Table */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-foreground">Huespedes Recientes</CardTitle>
-              <CardDescription>Ultimos huespedes registrados con reserva activa</CardDescription>
+              <CardTitle className="text-foreground">Reservas Recientes</CardTitle>
+              <CardDescription>Reservas con huesped y habitacion</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
@@ -633,33 +804,36 @@ export function ReportsView() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {reservations.map((res) => {
-                    const guest = getGuestById(res.guestId)
-                    const room = getRoomById(res.roomId)
-                    return (
-                      <TableRow key={res.id}>
-                        <TableCell className="font-medium text-foreground">{guest?.name}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-xs">{guest?.country}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary" className="text-xs">Hab. {room?.number}</Badge>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">{res.checkIn}</TableCell>
-                        <TableCell className="text-muted-foreground text-sm">{res.checkOut}</TableCell>
-                        <TableCell>
-                          <Badge className={`text-xs border-0 ${
-                            res.status === "checkin" ? "bg-emerald-100 text-emerald-800" :
-                            res.status === "confirmada" ? "bg-sky-100 text-sky-800" :
-                            "bg-muted text-muted-foreground"
-                          }`}>
-                            {res.status === "checkin" ? "Check-in" : res.status === "confirmada" ? "Confirmada" : res.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right font-medium text-foreground">{formatCurrency(res.totalAmount)}</TableCell>
-                      </TableRow>
-                    )
-                  })}
+                  {reservations
+                    .filter((r) => r.status !== 'cancelada')
+                    .slice(0, 10)
+                    .map((res) => {
+                      const guest = guests.find((g) => g.id === res.guestId)
+                      const room = roomById.get(res.roomId)
+                      return (
+                        <TableRow key={res.id}>
+                          <TableCell className="font-medium text-foreground">{guest?.name}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs">{guest?.country}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className="text-xs">Hab. {room?.number}</Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm">{res.checkIn}</TableCell>
+                          <TableCell className="text-muted-foreground text-sm">{res.checkOut}</TableCell>
+                          <TableCell>
+                            <Badge className={`text-xs border-0 ${
+                              res.status === "checkin" ? "bg-emerald-100 text-emerald-800" :
+                              res.status === "confirmada" ? "bg-sky-100 text-sky-800" :
+                              "bg-muted text-muted-foreground"
+                            }`}>
+                              {res.status === "checkin" ? "Check-in" : res.status === "confirmada" ? "Confirmada" : res.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-medium text-foreground">{formatCurrency(res.totalAmount)}</TableCell>
+                        </TableRow>
+                      )
+                    })}
                 </TableBody>
               </Table>
             </CardContent>

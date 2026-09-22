@@ -13,7 +13,7 @@ Sistema de gestión hotelera (PMS) y punto de venta (POS) para catering. Monorep
 - **Tipos compartidos**: `@hotel/types` en `packages/types/`
 - **Package manager**: pnpm (NO npm)
 - **Testing**: Vitest + React Testing Library (frontend)
-- **API testing**: Bruno collection en `backend/bruno/` (32 requests)
+- **API testing**: Bruno collection en `backend/bruno/` (34 requests)
 
 ## Inicio rápido
 
@@ -35,7 +35,7 @@ pnpm dev:api                                  # Backend en http://localhost:3001
 | `pnpm build` | Build frontend |
 | `pnpm build:api` | Build backend (tsc → `dist/`) |
 | `pnpm lint` | ESLint frontend |
-| `pnpm test` | Vitest frontend (35 tests) |
+| `pnpm test` | Vitest frontend (49 tests) |
 | `docker compose up -d` | Levantar PostgreSQL |
 | `pnpm --filter @hotel/backend db:migrate` | Aplicar migraciones |
 | `pnpm --filter @hotel/backend db:generate` | Generar migración desde schema |
@@ -193,7 +193,7 @@ backend/                    ← @hotel/backend — Fastify API (PostgreSQL)
 
 ## Problemas conocidos
 
-- Frontend usa datos mock (sin persistencia real, auth ficticia)
-- Backend: auth JWT funcional, pero sin refresh tokens
-- Sin rate limiting en endpoints públicos
-- Sin logging estructurado más allá de fastify logger
+- Frontend usa datos mock solo en páginas de diseño (`/designs`); las 8 vistas usan la API real
+- Backend: auth JWT con refresh tokens (cookie de 7d), pero sin revocación server-side de refresh
+- Rate limiting solo en `/api/auth/login`, `/api/auth/register` y `/api/auth/refresh`
+- Logging: pino con redacción de credenciales, sin correlación entre microservicios

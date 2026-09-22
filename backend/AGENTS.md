@@ -131,13 +131,15 @@ await db.delete(rooms).where(eq(rooms.id, id))
 |--------|----------|------|-------------|
 | GET | /health | No | Health check |
 | POST | /api/auth/register | No | Registro (primero = admin) |
-| POST | /api/auth/login | No | Login → token JWT |
+| POST | /api/auth/login | No | Login → token JWT + cookies (access + refresh) |
+| POST | /api/auth/refresh | No | Renueva access token vía cookie refresh (7d) |
+| POST | /api/auth/logout | No | Limpia cookies de sesión |
 | GET | /api/auth/me | Sí | Datos del usuario actual |
 | GET | /api/rooms | Sí | Lista habitaciones (filtros: status, floor, type) |
 | POST | /api/rooms | Admin | Crear habitación |
 | GET | /api/rooms/:id | Sí | Detalle habitación |
 | PATCH | /api/rooms/:id | Admin | Actualizar habitación |
-| PATCH | /api/rooms/:id/status | Admin | Cambiar estado (libre/ocupada/mantenimiento/limpieza) |
+| PATCH | /api/rooms/:id/status | Sí | Cambiar estado (libre/ocupada/mantenimiento/limpieza) |
 | GET | /api/guests | Sí | Lista huéspedes (filtro: q = búsqueda) |
 | POST | /api/guests | Sí | Crear huésped |
 | GET | /api/guests/:id | Sí | Detalle huésped |
@@ -187,7 +189,7 @@ services:
 
 ## Bruno Collection
 
-Colección de 32 requests en `backend/bruno/` para testing de API:
+Colección de 34 requests en `backend/bruno/` para testing de API:
 - Importar en Bruno → seleccionar entorno `dev` (baseUrl: localhost:3001)
 - Login automático: register/login scripts guardan `{{token}}`
 - Organizado por módulo: health/, auth/, rooms/, guests/, reservations/, pos/, billing/, reports/
@@ -209,7 +211,8 @@ Colección de 32 requests en `backend/bruno/` para testing de API:
 
 ## Problemas conocidos
 
-- Sin rate limiting en endpoints públicos
-- Sin refresh tokens (solo access token con expiración 7d)
+- Access token 15m + refresh token 7d (cookie HttpOnly), refresh sin revocación server-side
+- Rate limiting solo en `/api/auth/login`, `/api/auth/register` y `/api/auth/refresh` (global 300/min)
+- Logging estructurado con pino + redacción de credenciales, sin correlación entre microservicios
 - Seed hardcodea datos relativos a la fecha actual (no reproducible en tests)
 - `reports/financial` no retorna `occupancyRate` (solo `totalRevenue`)

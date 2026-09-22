@@ -28,6 +28,13 @@ export default fp(async (app) => {
       })
     }
 
+    const statusCode = (error as Error & { statusCode?: number }).statusCode
+    if (statusCode && statusCode >= 400 && statusCode < 500) {
+      return reply.code(statusCode).send({
+        error: (error as Error & { message?: string }).message ?? 'Solicitud inválida',
+      })
+    }
+
     req.log.error(error)
     reply.code(500).send({ error: 'Error interno del servidor' })
   })

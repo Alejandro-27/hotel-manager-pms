@@ -16,6 +16,7 @@ export default async function authRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>()
 
   typedApp.post('/api/auth/register', {
+    config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
     schema: { body: registerSchema },
   }, async (req, reply) => {
     const user = await register(req.body)
@@ -25,6 +26,7 @@ export default async function authRoutes(app: FastifyInstance) {
   })
 
   typedApp.post('/api/auth/login', {
+    config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
     schema: { body: loginSchema },
   }, async (req, reply) => {
     const user = await login(req.body)

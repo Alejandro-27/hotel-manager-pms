@@ -22,7 +22,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     api.auth
       .me()
       .then(setUser)
-      .catch(() => setUser(null))
+      .catch(() => {
+        return api.auth
+          .refresh()
+          .then(() => api.auth.me())
+          .then(setUser)
+          .catch(() => setUser(null))
+      })
       .finally(() => setIsLoading(false))
   }, [])
 

@@ -59,7 +59,7 @@ function buildQuery(params?: Record<string, string | number | undefined>): strin
 }
 
 const SESSION_EXPIRED_EVENT = 'session-expired'
-const publicEndpoints = new Set(['/api/auth/login', '/api/auth/register', '/api/auth/me'])
+const publicEndpoints = new Set(['/api/auth/login', '/api/auth/register', '/api/auth/me', '/api/auth/refresh'])
 
 export function emitSessionExpired(): void {
   if (typeof window !== 'undefined') {
@@ -73,7 +73,7 @@ export function onSessionExpired(callback: () => void): () => void {
   return () => window.removeEventListener(SESSION_EXPIRED_EVENT, callback)
 }
 
-async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+async function doRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${endpoint}`, {
     credentials: 'include',
     headers: {
@@ -88,13 +88,40 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   if (!res.ok) {
     const message =
       json?.error ?? json?.message ?? `Error en la petición (${res.status})`
-    if (res.status === 401 && !publicEndpoints.has(endpoint)) {
-      emitSessionExpired()
-    }
     throw new ApiError(res.status, message)
   }
 
   return json as T
+}
+
+let refreshPromise: Promise<boolean> | null = null
+
+async function tryRefreshSession(): Promise<boolean> {
+  if (!refreshPromise) {
+    refreshPromise = api.auth
+      .refresh()
+      .then(() => true)
+      .catch(() => false)
+      .finally(() => {
+        refreshPromise = null
+      })
+  }
+  return refreshPromise
+}
+
+async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  try {
+    return await doRequest<T>(endpoint, options)
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401 && !publicEndpoints.has(endpoint)) {
+      const refreshed = await tryRefreshSession()
+      if (refreshed) {
+        return doRequest<T>(endpoint, options)
+      }
+      emitSessionExpired()
+    }
+    throw error
+  }
 }
 
 export const api = {
@@ -105,6 +132,7 @@ export const api = {
       request<AuthResponse>('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }),
     me: () => request<AuthUser>('/api/auth/me'),
     logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
+    refresh: () => doRequest<AuthResponse>('/api/auth/refresh', { method: 'POST' }),
   },
 
   rooms: {

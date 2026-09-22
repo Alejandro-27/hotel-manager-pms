@@ -1,10 +1,11 @@
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyReply } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { register, login, buildAuthUser, getMe } from './service.js'
 import { registerSchema, loginSchema } from './schemas.js'
+import type { AuthUser } from '../../plugins/auth.js'
 import { env } from '../../config/env.js'
 
-const cookieOptions = {
+const accessCookie = {
   httpOnly: true,
   sameSite: 'lax' as const,
   secure: env.nodeEnv === 'production',
@@ -12,16 +13,34 @@ const cookieOptions = {
   maxAge: 7 * 24 * 60 * 60,
 }
 
+const refreshCookie = {
+  httpOnly: true,
+  sameSite: 'lax' as const,
+  secure: env.nodeEnv === 'production',
+  path: '/api/auth',
+  maxAge: 7 * 24 * 60 * 60,
+}
+
 export default async function authRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>()
+
+  function setAuthCookies(reply: FastifyReply, user: { id: string; name: string; email: string; role: string }) {
+    const token = app.jwt.sign(buildAuthUser(user))
+    const refreshToken = app.jwt.sign(
+      { ...buildAuthUser(user), type: 'refresh' },
+      { expiresIn: env.jwtRefreshExpiresIn }
+    )
+    reply.setCookie('token', token, accessCookie)
+    reply.setCookie('refreshToken', refreshToken, refreshCookie)
+    return token
+  }
 
   typedApp.post('/api/auth/register', {
     config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
     schema: { body: registerSchema },
   }, async (req, reply) => {
     const user = await register(req.body)
-    const token = app.jwt.sign(buildAuthUser(user))
-    reply.setCookie('token', token, cookieOptions)
+    const token = setAuthCookies(reply, user)
     reply.code(201).send({ user, token })
   })
 
@@ -30,13 +49,38 @@ export default async function authRoutes(app: FastifyInstance) {
     schema: { body: loginSchema },
   }, async (req, reply) => {
     const user = await login(req.body)
-    const token = app.jwt.sign(buildAuthUser(user))
-    reply.setCookie('token', token, cookieOptions)
+    const token = setAuthCookies(reply, user)
     reply.send({ user, token })
+  })
+
+  typedApp.post('/api/auth/refresh', {
+    config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+  }, async (req, reply) => {
+    const token = req.cookies?.refreshToken
+    if (!token) {
+      reply.code(401).send({ error: 'Sesión expirada' })
+      return
+    }
+    let payload: AuthUser & { type?: string }
+    try {
+      payload = await app.jwt.verify<AuthUser & { type?: string }>(token)
+    } catch {
+      reply.code(401).send({ error: 'Sesión expirada' })
+      return
+    }
+    if (payload.type !== 'refresh') {
+      reply.code(401).send({ error: 'Sesión expirada' })
+      return
+    }
+
+    const user = await getMe(payload.sub)
+    const newToken = setAuthCookies(reply, user)
+    reply.send({ user, token: newToken })
   })
 
   typedApp.post('/api/auth/logout', async (_req, reply) => {
     reply.clearCookie('token', { path: '/' })
+    reply.clearCookie('refreshToken', { path: '/api/auth' })
     reply.send({ ok: true })
   })
 

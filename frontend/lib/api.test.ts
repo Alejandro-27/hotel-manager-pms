@@ -35,8 +35,8 @@ describe('manejo de respuestas no-OK', () => {
   })
 })
 
-describe('evento de sesión expirada', () => {
-  it('dispara session-expired al recibir 401 en endpoint protegido', async () => {
+describe('evento de sesión expirada y refresh', () => {
+  it('dispara session-expired al recibir 401 en endpoint protegido y no poder refrescar', async () => {
     const listener = vi.fn()
     const off = onSessionExpired(listener)
 
@@ -45,6 +45,25 @@ describe('evento de sesión expirada', () => {
 
     expect(listener).toHaveBeenCalledTimes(1)
     off()
+  })
+
+  it('reintenta la peticion si el refresh de sesion funciona', async () => {
+    mockFetch
+      .mockResolvedValueOnce(jsonResponse({ error: 'token invalido' }, 401))
+      .mockResolvedValueOnce(jsonResponse({ user: { id: 'u1', name: 'A', email: 'a@b.c', role: 'admin', hotelName: null }, token: 'new' }, 200))
+      .mockResolvedValueOnce(jsonResponse([{ id: 'r1' }], 200))
+
+    const result = await api.rooms.get()
+
+    expect(result).toEqual([{ id: 'r1' }])
+    expect(mockFetch).toHaveBeenCalledTimes(3)
+  })
+
+  it('no reintenta la peticion si el refresh falla', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ error: 'sesion expirada' }, 401))
+    const error = await api.rooms.get().catch((e) => e)
+    expect(error).toBeInstanceOf(ApiError)
+    expect(mockFetch).toHaveBeenCalledTimes(2)
   })
 
   it('no dispara session-expired en login con 401', async () => {

@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useTheme } from "next-themes"
+import { useAuth } from "@/lib/auth-context"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -32,12 +33,14 @@ import {
   Users,
   Receipt,
   Clock,
+  UserRound,
 } from "lucide-react"
 
 export function SettingsView() {
   const { theme, setTheme } = useTheme()
-  const [hotelName, setHotelName] = useState("Gran Hotel Central")
-  const [hotelEmail, setHotelEmail] = useState("info@granhotelcentral.com")
+  const { user } = useAuth()
+  const [hotelName, setHotelName] = useState(user?.hotelName ?? "Mi Hotel")
+  const [hotelEmail, setHotelEmail] = useState(user?.email ?? "")
   const [hotelPhone, setHotelPhone] = useState("+34 912 345 678")
   const [hotelAddress, setHotelAddress] = useState("Calle Mayor 42, 28013 Madrid, Espana")
   const [hotelWebsite, setHotelWebsite] = useState("www.granhotelcentral.com")
@@ -93,6 +96,39 @@ export function SettingsView() {
 
         {/* General Tab */}
         <TabsContent value="general" className="mt-4 flex flex-col gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-foreground flex items-center gap-2">
+                <UserRound className="size-4" />
+                Mi Cuenta
+              </CardTitle>
+              <CardDescription>Perfil de la sesion actual</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex size-12 items-center justify-center rounded-full bg-primary/10">
+                    <UserRound className="size-6 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-base font-semibold text-foreground">{user?.name}</p>
+                    <p className="text-sm text-muted-foreground">{user?.email}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs capitalize">
+                    {user?.role}
+                  </Badge>
+                  {user?.hotelName && (
+                    <Badge className="bg-emerald-100 text-emerald-800 border-0 text-xs">
+                      Hotel: {user.hotelName}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="text-foreground flex items-center gap-2">

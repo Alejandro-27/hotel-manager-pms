@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, useEffect, useCallback, useState, type ReactNode } from "react"
-import { api, type AuthUser } from "./api"
+import { api, onSessionExpired, type AuthUser } from "./api"
 import type { LoginFormData, RegisterFormData } from "./validations"
 
 interface AuthContextType {
@@ -24,6 +24,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then(setUser)
       .catch(() => setUser(null))
       .finally(() => setIsLoading(false))
+  }, [])
+
+  useEffect(() => {
+    const off = onSessionExpired(() => setUser(null))
+    return off
   }, [])
 
   const login = useCallback(async (data: LoginFormData) => {

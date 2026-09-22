@@ -58,6 +58,21 @@ function buildQuery(params?: Record<string, string | number | undefined>): strin
   return query ? `?${query}` : ''
 }
 
+const SESSION_EXPIRED_EVENT = 'session-expired'
+const publicEndpoints = new Set(['/api/auth/login', '/api/auth/register', '/api/auth/me'])
+
+export function emitSessionExpired(): void {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT))
+  }
+}
+
+export function onSessionExpired(callback: () => void): () => void {
+  if (typeof window === 'undefined') return () => {}
+  window.addEventListener(SESSION_EXPIRED_EVENT, callback)
+  return () => window.removeEventListener(SESSION_EXPIRED_EVENT, callback)
+}
+
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${endpoint}`, {
     credentials: 'include',
@@ -73,6 +88,9 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   if (!res.ok) {
     const message =
       json?.error ?? json?.message ?? `Error en la petición (${res.status})`
+    if (res.status === 401 && !publicEndpoints.has(endpoint)) {
+      emitSessionExpired()
+    }
     throw new ApiError(res.status, message)
   }
 

@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { loginSchema, registerSchema, type LoginFormData, type RegisterFormData } from "@/lib/validations"
 import { useAuth } from "@/lib/auth-context"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export function AuthScreen() {
   const { login: doLogin, register: doRegister } = useAuth()
@@ -55,7 +56,12 @@ export function AuthScreen() {
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="relative flex min-h-screen">
+      {/* Theme toggle */}
+      <div className="absolute right-4 top-4 z-20 rounded-full bg-sidebar/10 p-0.5 backdrop-blur-sm">
+        <ThemeToggle />
+      </div>
+
       {/* Left panel - branding */}
       <div className="hidden lg:flex lg:w-1/2 flex-col justify-between bg-sidebar text-sidebar-foreground p-12 relative overflow-hidden">
         {/* Decorative elements */}

@@ -128,6 +128,8 @@ export const api = {
 
   products: {
     get: (category?: string) => request<Product[]>(`/api/products${buildQuery({ category })}`),
+    updateStock: (id: string, currentStock: number) =>
+      request<Product>(`/api/products/${id}/stock`, { method: 'PATCH', body: JSON.stringify({ currentStock }) }),
   },
 
   sales: {

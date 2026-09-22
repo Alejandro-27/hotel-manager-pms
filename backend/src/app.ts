@@ -16,7 +16,21 @@ import { env } from './config/env.js'
 
 export function buildApp() {
   const app = Fastify({
-    logger: true,
+    logger: {
+      level: env.nodeEnv === 'production' ? 'info' : 'debug',
+      redact: {
+        paths: [
+          'password',
+          '*.password',
+          '*.token',
+          '*.refreshToken',
+          'req.headers.authorization',
+          'req.headers.cookie',
+          'res.headers["set-cookie"]',
+        ],
+        censor: '[REDACTED]',
+      },
+    },
   }).withTypeProvider<ZodTypeProvider>()
 
   app.setValidatorCompiler(validatorCompiler)

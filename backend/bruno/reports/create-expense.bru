@@ -1,0 +1,20 @@
+meta {
+  name: Create Expense
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/expenses
+  headers {
+    Authorization: Bearer {{token}}
+    Content-Type: application/json
+  }
+  body: json
+  {
+    "category": "servicios",
+    "amount": 450,
+    "date": "2026-09-15",
+    "note": "Factura de luz"
+  }
+}

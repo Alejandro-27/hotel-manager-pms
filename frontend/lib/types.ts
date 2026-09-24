@@ -6,7 +6,9 @@ export type {
   Sale,
   SaleItem,
   Invoice,
+  Expense,
   RoomStatus,
   ReservationStatus,
   InvoiceStatus,
+  ExpenseCategory,
 } from '@hotel/types'

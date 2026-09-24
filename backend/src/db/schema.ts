@@ -86,6 +86,15 @@ export const invoices = pgTable('invoices', {
   createdAt: text('created_at').notNull(),
 })
 
+export const expenses = pgTable('expenses', {
+  id: text('id').primaryKey(),
+  category: text('category', { enum: ['mantenimiento', 'limpieza', 'servicios', 'nominas', 'otros'] }).notNull(),
+  amount: real('amount').notNull(),
+  date: text('date').notNull(),
+  note: text('note').notNull().default(''),
+  createdAt: text('created_at').notNull(),
+})
+
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
 export type Room = typeof rooms.$inferSelect
@@ -100,3 +109,5 @@ export type Sale = typeof sales.$inferSelect
 export type NewSale = typeof sales.$inferInsert
 export type Invoice = typeof invoices.$inferSelect
 export type NewInvoice = typeof invoices.$inferInsert
+export type Expense = typeof expenses.$inferSelect
+export type NewExpense = typeof expenses.$inferInsert

@@ -2,8 +2,9 @@ import { randomUUID } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import { db, client } from './index.js'
 import {
-  users, rooms, guests, reservations, products, sales, invoices,
-  type NewRoom, type NewGuest, type NewReservation, type NewProduct, type NewSale, type NewInvoice,
+  users, rooms, guests, reservations, products, sales, invoices, expenses,
+  type NewRoom, type NewGuest, type NewReservation, type NewProduct, type NewSale,
+  type NewInvoice, type NewExpense,
 } from './schema.js'
 import { eq, sql } from 'drizzle-orm'
 
@@ -14,6 +15,15 @@ function iso(offsetDays: number): string {
   const d = new Date()
   d.setDate(d.getDate() + offsetDays)
   return d.toISOString().slice(0, 10)
+}
+
+function monthDay(offsetMonths: number, day: number): string {
+  const d = new Date()
+  d.setDate(1)
+  d.setMonth(d.getMonth() - offsetMonths)
+  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
+  d.setDate(Math.min(day, lastDay))
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 const roomData: NewRoom[] = [
@@ -106,6 +116,21 @@ const invoiceData: NewInvoice[] = [
   },
 ]
 
+const expenseData: NewExpense[] = [
+  { id: "e1", category: "servicios", amount: 950, date: monthDay(5, 5), note: "Electricidad y agua", createdAt: now },
+  { id: "e2", category: "mantenimiento", amount: 320, date: monthDay(5, 12), note: "Reparacion climatizacion 203", createdAt: now },
+  { id: "e3", category: "limpieza", amount: 450, date: monthDay(4, 3), note: "Productos de limpieza", createdAt: now },
+  { id: "e4", category: "servicios", amount: 900, date: monthDay(4, 18), note: "Internet y telefonia", createdAt: now },
+  { id: "e5", category: "nominas", amount: 4200, date: monthDay(3, 1), note: "Nomina equipo recepcion", createdAt: now },
+  { id: "e6", category: "mantenimiento", amount: 210, date: monthDay(3, 15), note: "Fontaneria bano 501", createdAt: now },
+  { id: "e7", category: "limpieza", amount: 380, date: monthDay(2, 7), note: "Lavanderia ropa de cama", createdAt: now },
+  { id: "e8", category: "servicios", amount: 610, date: monthDay(2, 22), note: "Gas y calefaccion", createdAt: now },
+  { id: "e9", category: "otros", amount: 150, date: monthDay(1, 10), note: "Suministros de oficina", createdAt: now },
+  { id: "e10", category: "mantenimiento", amount: 490, date: monthDay(1, 24), note: "Pintura exterior", createdAt: now },
+  { id: "e11", category: "servicios", amount: 870, date: monthDay(0, 6), note: "Electricidad y agua", createdAt: now },
+  { id: "e12", category: "nominas", amount: 4100, date: monthDay(0, 1), note: "Nomina mensual", createdAt: now },
+]
+
 async function seed() {
   const count = await db.select({ count: sql<number>`count(*)` }).from(users)
   const userCount = Number(count[0]?.count ?? 0)
@@ -126,6 +151,7 @@ async function seed() {
   await db.insert(products).values(productData)
   await db.insert(sales).values(saleData)
   await db.insert(invoices).values(invoiceData)
+  await db.insert(expenses).values(expenseData)
 
   console.log('Seed complete:')
   console.log(`  - ${roomData.length} rooms`)
@@ -134,6 +160,7 @@ async function seed() {
   console.log(`  - ${productData.length} products`)
   console.log(`  - ${saleData.length} sales`)
   console.log(`  - ${invoiceData.length} invoices`)
+  console.log(`  - ${expenseData.length} expenses`)
   console.log('  - 2 users (admin@hotel.com / Admin123!)')
 }
 

@@ -12,6 +12,7 @@ import guestRoutes from './modules/guests/routes.js'
 import reservationRoutes from './modules/reservations/routes.js'
 import posRoutes from './modules/pos/routes.js'
 import billingRoutes from './modules/billing/routes.js'
+import expenseRoutes from './modules/expenses/routes.js'
 import reportRoutes from './modules/reports/routes.js'
 import { env } from './config/env.js'
 
@@ -69,6 +70,7 @@ export function buildApp() {
   app.register(reservationRoutes)
   app.register(posRoutes)
   app.register(billingRoutes)
+  app.register(expenseRoutes)
   app.register(reportRoutes)
 
   return app

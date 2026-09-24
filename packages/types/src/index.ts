@@ -76,3 +76,13 @@ export interface Invoice {
   status: InvoiceStatus
   date: string
 }
+
+export type ExpenseCategory = 'mantenimiento' | 'limpieza' | 'servicios' | 'nominas' | 'otros'
+
+export interface Expense {
+  id: string
+  category: ExpenseCategory
+  amount: number
+  date: string
+  note: string
+}

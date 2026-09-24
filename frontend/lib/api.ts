@@ -1,4 +1,4 @@
-import type { Room, Guest, Reservation, Product, SaleItem, Sale, Invoice } from './types'
+import type { Room, Guest, Reservation, Product, SaleItem, Sale, Invoice, Expense } from './types'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
 
@@ -197,6 +197,13 @@ export const api = {
       request<Invoice[]>(`/api/invoices${buildQuery(params)}`),
     pay: (id: string, data: { amount: number; paymentMethod?: Reservation['paymentMethod'] }) =>
       request<Invoice>(`/api/invoices/${id}/pay`, { method: 'POST', body: JSON.stringify(data) }),
+  },
+
+  expenses: {
+    get: () => request<Expense[]>('/api/expenses'),
+    create: (data: { category: Expense['category']; amount: number; date: string; note?: string }) =>
+      request<Expense>('/api/expenses', { method: 'POST', body: JSON.stringify(data) }),
+    remove: (id: string) => request<Expense>(`/api/expenses/${id}`, { method: 'DELETE' }),
   },
 
   reports: {

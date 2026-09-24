@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
@@ -37,6 +40,8 @@ import {
   AlertCircle,
   RefreshCw,
   ShieldAlert,
+  Plus,
+  Trash2,
 } from "lucide-react"
 import {
   ChartContainer,
@@ -47,7 +52,7 @@ import {
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Pie, PieChart, Cell } from "recharts"
 import { api, type FinancialReport, type OccupancyReport } from "@/lib/api"
 import { useAuth } from "@/lib/auth-context"
-import type { Invoice, Reservation, Room, Guest, Product, Sale } from "@/lib/types"
+import type { Invoice, Reservation, Room, Guest, Product, Sale, Expense } from "@/lib/types"
 import { formatCurrency } from "@/lib/utils"
 
 const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
@@ -123,6 +128,18 @@ export function ReportsView() {
   const [financial, setFinancial] = useState<FinancialReport | null>(null)
   const [occupancy, setOccupancy] = useState<OccupancyReport | null>(null)
 
+  const [expenses, setExpenses] = useState<Expense[]>([])
+  const [expenseDialogOpen, setExpenseDialogOpen] = useState(false)
+  const [creatingExpense, setCreatingExpense] = useState(false)
+  const [expenseError, setExpenseError] = useState<string | null>(null)
+  const [deletingExpense, setDeletingExpense] = useState<string | null>(null)
+  const [expenseForm, setExpenseForm] = useState({
+    category: "servicios" as Expense["category"],
+    amount: "",
+    date: new Date().toISOString().slice(0, 10),
+    note: "",
+  })
+
   const fetchData = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -136,8 +153,9 @@ export function ReportsView() {
         api.invoices.get(),
         api.reports.occupancy(),
         isAdmin ? api.reports.financial() : Promise.resolve(null),
+        isAdmin ? api.expenses.get() : Promise.resolve([] as Expense[]),
       ])
-      const [r, g, res, p, s, inv, occ, fin] = await base
+      const [r, g, res, p, s, inv, occ, fin, exp] = await base
       setRooms(r)
       setGuests(g)
       setReservations(res)
@@ -146,6 +164,7 @@ export function ReportsView() {
       setInvoices(inv)
       setOccupancy(occ)
       setFinancial(fin)
+      setExpenses(exp)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar los informes")
     } finally {
@@ -269,6 +288,44 @@ export function ReportsView() {
       .filter((status) => (map.get(status) ?? 0) > 0)
       .map((status) => ({ name: statusLabels[status] ?? status, count: map.get(status) ?? 0, fill: `var(--color-${status})` }))
   }, [occupancy])
+
+  async function handleCreateExpense() {
+    const amount = Number(expenseForm.amount)
+    if (!expenseForm.date || Number.isNaN(amount) || amount < 0) {
+      setExpenseError("Introduce un importe valido")
+      return
+    }
+    setCreatingExpense(true)
+    setExpenseError(null)
+    try {
+      await api.expenses.create({
+        category: expenseForm.category,
+        amount,
+        date: expenseForm.date,
+        note: expenseForm.note.trim() || undefined,
+      })
+      setExpenseDialogOpen(false)
+      setExpenseForm({ category: "servicios", amount: "", date: new Date().toISOString().slice(0, 10), note: "" })
+      fetchData()
+    } catch (err) {
+      setExpenseError(err instanceof Error ? err.message : "Error al crear el gasto")
+    } finally {
+      setCreatingExpense(false)
+    }
+  }
+
+  async function handleDeleteExpense(id: string) {
+    setDeletingExpense(id)
+    setExpenseError(null)
+    try {
+      await api.expenses.remove(id)
+      fetchData()
+    } catch (err) {
+      setExpenseError(err instanceof Error ? err.message : "Error al eliminar el gasto")
+    } finally {
+      setDeletingExpense(null)
+    }
+  }
 
   if (loading) {
     return (
@@ -509,6 +566,69 @@ export function ReportsView() {
                           </TableRow>
                         )
                       })}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-foreground">Gastos Registrados</CardTitle>
+                    <CardDescription>Desglose de gastos por concepto</CardDescription>
+                  </div>
+                  <Button size="sm" onClick={() => { setExpenseError(null); setExpenseDialogOpen(true) }}>
+                    <Plus className="mr-1 size-4" />
+                    Nuevo gasto
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {expenseError && (
+                    <div className="mb-3 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                      <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                      <span>{expenseError}</span>
+                    </div>
+                  )}
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Fecha</TableHead>
+                        <TableHead>Categoria</TableHead>
+                        <TableHead>Concepto</TableHead>
+                        <TableHead className="text-right">Importe</TableHead>
+                        <TableHead className="w-12"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {expenses.map((e) => (
+                        <TableRow key={e.id}>
+                          <TableCell className="text-muted-foreground text-sm">{e.date}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="capitalize text-xs">{e.category}</Badge>
+                          </TableCell>
+                          <TableCell className="text-foreground">{e.note || "—"}</TableCell>
+                          <TableCell className="text-right font-medium text-foreground">{formatCurrency(e.amount)}</TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-8 text-destructive hover:text-destructive"
+                              disabled={deletingExpense === e.id}
+                              onClick={() => handleDeleteExpense(e.id)}
+                            >
+                              <Trash2 className="size-4" />
+                              <span className="sr-only">Eliminar gasto</span>
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {expenses.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-muted-foreground">
+                            Sin gastos registrados
+                          </TableCell>
+                        </TableRow>
+                      )}
                     </TableBody>
                   </Table>
                 </CardContent>
@@ -840,6 +960,71 @@ export function ReportsView() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* New Expense Dialog */}
+      <Dialog open={expenseDialogOpen} onOpenChange={setExpenseDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Nuevo Gasto</DialogTitle>
+            <DialogDescription>Registra un gasto del hotel</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="expense-category">Categoria</Label>
+                <Select
+                  value={expenseForm.category}
+                  onValueChange={(v) => setExpenseForm({ ...expenseForm, category: v as Expense["category"] })}
+                >
+                  <SelectTrigger id="expense-category">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(["mantenimiento", "limpieza", "servicios", "nominas", "otros"] as Expense["category"][]).map((c) => (
+                      <SelectItem key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="expense-date">Fecha</Label>
+                <Input
+                  id="expense-date"
+                  type="date"
+                  value={expenseForm.date}
+                  onChange={(e) => setExpenseForm({ ...expenseForm, date: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="expense-amount">Importe</Label>
+              <Input
+                id="expense-amount"
+                type="number"
+                min="0"
+                step="0.01"
+                value={expenseForm.amount}
+                onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="expense-note">Concepto (opcional)</Label>
+              <Input
+                id="expense-note"
+                value={expenseForm.note}
+                onChange={(e) => setExpenseForm({ ...expenseForm, note: e.target.value })}
+                placeholder="Ej. Reparacion climatizacion"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExpenseDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleCreateExpense} disabled={creatingExpense}>
+              {creatingExpense ? "Guardando..." : "Guardar gasto"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

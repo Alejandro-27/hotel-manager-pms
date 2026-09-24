@@ -1,6 +1,6 @@
 import { and, desc, eq, gte, like, sql } from 'drizzle-orm'
 import { db } from '../../db/index.js'
-import { invoices, products, reservations, rooms, sales } from '../../db/schema.js'
+import { expenses, invoices, products, reservations, rooms, sales } from '../../db/schema.js'
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10)
@@ -58,12 +58,16 @@ export async function getFinancialReport() {
       sql`${reservations.checkIn} < ${end}`,
       eq(reservations.status, 'checkout'),
     ))
+    const monthExpenses = await db.select().from(expenses).where(and(
+      gte(expenses.date, start),
+      sql`${expenses.date} < ${end}`,
+    ))
 
-    const d = new Date(start)
+    const monthIndex = Number(start.slice(5, 7)) - 1
     monthly.push({
-      month: monthNames[d.getMonth()],
+      month: monthNames[monthIndex],
       ingresos: Math.round((monthSales.reduce((s, x) => s + x.total, 0) + monthReservations.reduce((s, x) => s + x.totalAmount, 0)) * 100) / 100,
-      gastos: 0,
+      gastos: Math.round(monthExpenses.reduce((s, x) => s + x.amount, 0) * 100) / 100,
     })
   }
 

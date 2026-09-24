@@ -174,6 +174,14 @@ export const api = {
 
   products: {
     get: (category?: string) => request<Product[]>(`/api/products${buildQuery({ category })}`),
+    create: (data: {
+      name: string
+      category: Product['category']
+      price: number
+      currentStock?: number
+      minStock?: number
+      image?: string
+    }) => request<Product>('/api/products', { method: 'POST', body: JSON.stringify(data) }),
     updateStock: (id: string, currentStock: number) =>
       request<Product>(`/api/products/${id}/stock`, { method: 'PATCH', body: JSON.stringify({ currentStock }) }),
   },

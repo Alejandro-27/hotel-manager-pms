@@ -52,6 +52,8 @@ export function DashboardView() {
   const [sales, setSales] = useState<(import("@/lib/types").Sale)[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [checkingIn, setCheckingIn] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   const load = useMemo(
     () => () => {
@@ -84,6 +86,19 @@ export function DashboardView() {
   useEffect(() => {
     load()
   }, [load])
+
+  async function handleCheckin(id: string) {
+    setCheckingIn(id)
+    setActionError(null)
+    try {
+      await api.reservations.checkin(id)
+      load()
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Error en el check-in")
+    } finally {
+      setCheckingIn(null)
+    }
+  }
 
   const guestMap = useMemo(() => new Map(guests.map((g) => [g.id, g])), [guests])
   const roomMap = useMemo(() => new Map(rooms.map((r) => [r.id, r])), [rooms])
@@ -362,20 +377,36 @@ export function DashboardView() {
                 const guest = guestMap.get(r.guestId)
                 const room = roomMap.get(r.roomId)
                 return (
-                  <div key={r.id} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="flex size-8 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground">
+                  <div key={r.id} className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="flex size-8 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground shrink-0">
                         {guest?.name.charAt(0).toUpperCase() ?? "?"}
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-foreground leading-tight">{guest?.name ?? "—"}</p>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground leading-tight truncate">{guest?.name ?? "—"}</p>
                         <p className="text-xs text-muted-foreground">Hab. {room?.number ?? "—"}</p>
                       </div>
                     </div>
-                    <Badge variant="outline" className="text-[10px]">Confirmado</Badge>
+                    <Button
+                      size="sm"
+                      className="h-7 px-2 text-xs shrink-0"
+                      disabled={checkingIn === r.id}
+                      onClick={() => handleCheckin(r.id)}
+                    >
+                      {checkingIn === r.id ? (
+                        <svg className="animate-spin h-3.5 w-3.5 mr-1" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                      ) : (
+                        <DoorOpen className="mr-1 size-3" />
+                      )}
+                      Check-in
+                    </Button>
                   </div>
                 )
               })}
+              {actionError && <p className="text-xs text-destructive">{actionError}</p>}
             </CardContent>
           </Card>
 

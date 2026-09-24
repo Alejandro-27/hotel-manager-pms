@@ -38,6 +38,7 @@ import {
   Pencil,
   AlertCircle,
   RefreshCw,
+  XCircle,
 } from "lucide-react"
 import { api } from "@/lib/api"
 import { BookingWizard } from "@/components/views/booking-wizard"
@@ -51,11 +52,13 @@ const statusStyles: Record<ReservationStatus, { label: string; variant: "default
 }
 
 export function GuestsView() {
+  const [allGuests, setAllGuests] = useState<Guest[]>([])
   const [guestsData, setGuestsData] = useState<Guest[]>([])
   const [reservationsData, setReservationsData] = useState<Reservation[]>([])
   const [roomsData, setRoomsData] = useState<Room[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [searching, setSearching] = useState(false)
 
   const [search, setSearch] = useState("")
   const [filterCountry, setFilterCountry] = useState("all")
@@ -76,6 +79,7 @@ export function GuestsView() {
         api.reservations.get(),
         api.rooms.get(),
       ])
+      setAllGuests(g)
       setGuestsData(g)
       setReservationsData(r)
       setRoomsData(rm)
@@ -90,9 +94,29 @@ export function GuestsView() {
     fetchData()
   }, [fetchData])
 
+  useEffect(() => {
+    const term = search.trim()
+    if (term.length < 2) {
+      setGuestsData(allGuests)
+      setSearching(false)
+      return
+    }
+    setSearching(true)
+    const handler = setTimeout(() => {
+      api.guests
+        .get(term)
+        .then((results) => {
+          setGuestsData(results)
+          setSearching(false)
+        })
+        .catch(() => setSearching(false))
+    }, 300)
+    return () => clearTimeout(handler)
+  }, [search, allGuests])
+
   const countries = useMemo(() => {
-    return [...new Set(guestsData.map((g) => g.country))].sort()
-  }, [guestsData])
+    return [...new Set(allGuests.map((g) => g.country))].sort()
+  }, [allGuests])
 
   const filteredGuests = useMemo(() => {
     return guestsData.filter((g) => {
@@ -130,6 +154,16 @@ export function GuestsView() {
       fetchData()
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Error en check-out")
+    }
+  }
+
+  async function handleCancelReservation(id: string) {
+    setActionError(null)
+    try {
+      await api.reservations.cancel(id)
+      fetchData()
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Error al cancelar la reserva")
     }
   }
 
@@ -236,8 +270,14 @@ export function GuestsView() {
           {/* Guests Table */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-foreground">
+              <CardTitle className="flex items-center gap-2 text-foreground">
                 Huespedes ({filteredGuests.length})
+                {searching && (
+                  <svg className="animate-spin h-4 w-4 text-muted-foreground" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -294,6 +334,17 @@ export function GuestsView() {
                               >
                                 <UserCheck className="mr-1 size-3" />
                                 Check-in
+                              </Button>
+                            )}
+                            {!activeRes && pendingRes && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive hover:text-destructive"
+                                onClick={() => handleCancelReservation(pendingRes.id)}
+                              >
+                                <XCircle className="mr-1 size-3" />
+                                Cancelar
                               </Button>
                             )}
                             <Button
@@ -391,7 +442,7 @@ export function GuestsView() {
         open={bookingOpen}
         onOpenChange={setBookingOpen}
         rooms={roomsData}
-        guests={guestsData}
+        guests={allGuests}
         onComplete={fetchData}
         onError={setActionError}
       />

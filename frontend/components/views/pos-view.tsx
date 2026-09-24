@@ -10,6 +10,14 @@ import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import {
   Table,
   TableBody,
   TableCell,
@@ -41,6 +49,7 @@ import {
   RefreshCw,
 } from "lucide-react"
 import { api } from "@/lib/api"
+import { useAuth } from "@/lib/auth-context"
 import type { Product, Reservation, Guest, Room, SaleItem } from "@/lib/types"
 import { formatCurrency } from "@/lib/utils"
 
@@ -61,6 +70,7 @@ interface CartItem {
 }
 
 export function PosView() {
+  const { user } = useAuth()
   const [productsData, setProductsData] = useState<Product[]>([])
   const [reservationsData, setReservationsData] = useState<Reservation[]>([])
   const [guestsData, setGuestsData] = useState<Guest[]>([])
@@ -241,7 +251,12 @@ export function PosView() {
         </TabsContent>
 
         <TabsContent value="inventory" className="mt-4">
-          <InventoryTable products={productsData} onChanged={fetchData} onError={setActionError} />
+          <InventoryTable
+            products={productsData}
+            isAdmin={user?.role === "admin"}
+            onChanged={fetchData}
+            onError={setActionError}
+          />
         </TabsContent>
       </Tabs>
     </div>
@@ -489,10 +504,12 @@ function CartSidebar({
 
 function InventoryTable({
   products,
+  isAdmin,
   onChanged,
   onError,
 }: {
   products: Product[]
+  isAdmin: boolean
   onChanged: () => void
   onError: (msg: string | null) => void
 }) {
@@ -500,6 +517,17 @@ function InventoryTable({
     Object.fromEntries(products.map((p) => [p.id, p.currentStock]))
   )
   const [saving, setSaving] = useState<string | null>(null)
+
+  const [createOpen, setCreateOpen] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
+  const [form, setForm] = useState({
+    name: "",
+    category: "desayunos" as ProductCategory,
+    price: "",
+    currentStock: "0",
+    minStock: "0",
+  })
 
   useEffect(() => {
     setStockMap(Object.fromEntries(products.map((p) => [p.id, p.currentStock])))
@@ -518,13 +546,46 @@ function InventoryTable({
     }
   }
 
+  async function handleCreateProduct() {
+    const price = Number(form.price)
+    if (!form.name.trim() || Number.isNaN(price) || price < 0) {
+      setCreateError("Introduce un nombre y un precio valido")
+      return
+    }
+    setCreating(true)
+    setCreateError(null)
+    try {
+      await api.products.create({
+        name: form.name.trim(),
+        category: form.category,
+        price,
+        currentStock: Number(form.currentStock) || 0,
+        minStock: Number(form.minStock) || 0,
+      })
+      setCreateOpen(false)
+      setForm({ name: "", category: "desayunos", price: "", currentStock: "0", minStock: "0" })
+      onChanged()
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : "Error al crear el producto")
+    } finally {
+      setCreating(false)
+    }
+  }
+
   return (
-    <Card>
-      <CardHeader>
+    <>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2 text-foreground">
           <Package className="size-4" />
           Inventario de Productos
         </CardTitle>
+        {isAdmin && (
+          <Button size="sm" onClick={() => { setCreateError(null); setCreateOpen(true) }}>
+            <Plus className="mr-1 size-4" />
+            Nuevo Producto
+          </Button>
+        )}
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
@@ -597,5 +658,90 @@ function InventoryTable({
         </div>
       </CardContent>
     </Card>
+
+    {/* New Product Dialog */}
+    <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-foreground">Nuevo Producto</DialogTitle>
+          <DialogDescription>Añade un producto al inventario de catering</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-2">
+          <div className="grid gap-2">
+            <Label htmlFor="product-name">Nombre</Label>
+            <Input
+              id="product-name"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="Ej. Tostadas con mermelada"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="product-category">Categoria</Label>
+              <Select
+                value={form.category}
+                onValueChange={(v) => setForm({ ...form, category: v as ProductCategory })}
+              >
+                <SelectTrigger id="product-category">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((c) => (
+                    <SelectItem key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="product-price">Precio</Label>
+              <Input
+                id="product-price"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.price}
+                onChange={(e) => setForm({ ...form, price: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="product-stock">Stock actual</Label>
+              <Input
+                id="product-stock"
+                type="number"
+                min="0"
+                value={form.currentStock}
+                onChange={(e) => setForm({ ...form, currentStock: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="product-minstock">Stock minimo</Label>
+              <Input
+                id="product-minstock"
+                type="number"
+                min="0"
+                value={form.minStock}
+                onChange={(e) => setForm({ ...form, minStock: e.target.value })}
+              />
+            </div>
+          </div>
+          {createError && (
+            <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <span>{createError}</span>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
+          <Button onClick={handleCreateProduct} disabled={creating}>
+            {creating ? "Creando..." : "Crear producto"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }

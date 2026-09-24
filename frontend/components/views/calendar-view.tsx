@@ -23,8 +23,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { AlertCircle, ChevronLeft, ChevronRight, Plus, RefreshCw } from "lucide-react"
+import { AlertCircle, ChevronLeft, ChevronRight, Plus, RefreshCw, XCircle } from "lucide-react"
 import { api } from "@/lib/api"
+import { formatCurrency } from "@/lib/utils"
 import { roomStatusConfig } from "@/lib/constants"
 import type { Room, Reservation, Guest, RoomStatus } from "@/lib/types"
 
@@ -71,6 +72,10 @@ export function CalendarView() {
   const [formCheckOut, setFormCheckOut] = useState("")
   const [formGuests, setFormGuests] = useState("1")
   const [formPayment, setFormPayment] = useState<(typeof paymentMethods)[number]>("efectivo")
+
+  const [detailEntry, setDetailEntry] = useState<{ reservation: Reservation; guest: Guest | undefined } | null>(null)
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelError, setCancelError] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -123,16 +128,20 @@ export function CalendarView() {
   function handleCellClick(roomId: string, day: number) {
     const date = formatDate(currentYear, currentMonth, day)
     const key = `${roomId}-${date}`
-    if (!reservationMap[key]) {
-      setSelectedCell({ roomId, date })
-      setFormGuestId(guests[0]?.id ?? "")
-      setFormCheckIn(date)
-      setFormCheckOut(date)
-      setFormGuests("1")
-      setFormPayment("efectivo")
-      setCreateError(null)
-      setDialogOpen(true)
+    const entry = reservationMap[key]
+    if (entry) {
+      setCancelError(null)
+      setDetailEntry(entry)
+      return
     }
+    setSelectedCell({ roomId, date })
+    setFormGuestId(guests[0]?.id ?? "")
+    setFormCheckIn(date)
+    setFormCheckOut(date)
+    setFormGuests("1")
+    setFormPayment("efectivo")
+    setCreateError(null)
+    setDialogOpen(true)
   }
 
   function prevMonth() {
@@ -172,6 +181,21 @@ export function CalendarView() {
       setCreateError(err instanceof Error ? err.message : "Error al crear la reserva")
     } finally {
       setCreating(false)
+    }
+  }
+
+  async function handleCancelReservation() {
+    if (!detailEntry) return
+    setCancelling(true)
+    setCancelError(null)
+    try {
+      await api.reservations.cancel(detailEntry.reservation.id)
+      setDetailEntry(null)
+      fetchData()
+    } catch (err) {
+      setCancelError(err instanceof Error ? err.message : "Error al cancelar la reserva")
+    } finally {
+      setCancelling(false)
     }
   }
 
@@ -400,6 +424,88 @@ export function CalendarView() {
                 </>
               )}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reservation Detail Dialog */}
+      <Dialog open={!!detailEntry} onOpenChange={(open) => !open && setDetailEntry(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Detalle de Reserva</DialogTitle>
+            <DialogDescription>
+              {detailEntry && `Habitacion ${rooms.find(r => r.id === detailEntry.reservation.roomId)?.number ?? ""}`}
+            </DialogDescription>
+          </DialogHeader>
+          {detailEntry && (
+            <div className="grid gap-3 py-2 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Huesped</span>
+                <span className="font-medium text-foreground text-right">{detailEntry.guest?.name ?? "—"}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Estado</span>
+                <Badge variant="outline" className="capitalize">{detailEntry.reservation.status}</Badge>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Check-in</span>
+                <span className="font-medium text-foreground">{detailEntry.reservation.checkIn}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Check-out</span>
+                <span className="font-medium text-foreground">{detailEntry.reservation.checkOut}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Huespedes</span>
+                <span className="font-medium text-foreground">{detailEntry.reservation.guests}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Total</span>
+                <span className="font-medium text-foreground">{formatCurrency(detailEntry.reservation.totalAmount)}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Anticipo</span>
+                <span className="font-medium text-foreground">{formatCurrency(detailEntry.reservation.advancePayment)}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Metodo de pago</span>
+                <span className="font-medium text-foreground capitalize">{detailEntry.reservation.paymentMethod}</span>
+              </div>
+              {detailEntry.reservation.notes && (
+                <div>
+                  <span className="text-muted-foreground">Notas</span>
+                  <p className="mt-1 text-foreground">{detailEntry.reservation.notes}</p>
+                </div>
+              )}
+              {cancelError && (
+                <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                  <span>{cancelError}</span>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDetailEntry(null)}>Cerrar</Button>
+            {detailEntry &&
+              (detailEntry.reservation.status === "confirmada" || detailEntry.reservation.status === "checkin") && (
+                <Button variant="destructive" onClick={handleCancelReservation} disabled={cancelling}>
+                  {cancelling ? (
+                    <span className="flex items-center gap-2">
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Cancelando...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <XCircle className="size-4" />
+                      Cancelar reserva
+                    </span>
+                  )}
+                </Button>
+              )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

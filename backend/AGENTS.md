@@ -19,6 +19,7 @@ pnpm start            # node dist/index.js
 pnpm db:generate      # drizzle-kit generate (nueva migración)
 pnpm db:migrate       # aplicar migraciones a PostgreSQL
 pnpm seed             # datos de ejemplo (idempotente)
+pnpm test             # Vitest (fastify.inject contra BD hotel_manager_test)
 ```
 
 ## Estructura
@@ -27,23 +28,28 @@ pnpm seed             # datos de ejemplo (idempotente)
 src/
 ├── app.ts              ← buildApp(): Fastify + CORS + plugins + rutas (exportado para Vercel)
 ├── index.ts            ← migrate on boot + listen (PORT 3001)
+├── api.test.ts         ← Tests de API (fastify.inject, 12 tests)
 ├── config/env.ts       ← DATABASE_URL, JWT_SECRET, PORT, CORS_ORIGIN
 ├── db/
 │   ├── index.ts        ← postgres client (pool max: 10) + drizzle instance
-│   ├── schema.ts       ← 7 tablas: users, rooms, guests, reservations, products, sales, invoices
+│   ├── schema.ts       ← 8 tablas: users, rooms, guests, reservations, products, sales, invoices, expenses
 │   ├── migrate.ts      ← drizzle-orm/postgres-js/migrator
-│   └── seed.ts         ← 20 rooms, 8 guests, 8 reservations, 14 products, 4 sales, 3 invoices
+│   └── seed.ts         ← 20 rooms, 8 guests, 8 reservations, 14 products, 4 sales, 3 invoices, 12 expenses
 ├── plugins/
 │   ├── auth.ts         ← @fastify/jwt register + decorators authenticate/requireAdmin
 │   └── error-handler.ts ← AppError class + global error handler
 └── modules/
-    ├── auth/           ← POST /api/auth/register, POST /api/auth/login, GET /api/auth/me
+    ├── auth/           ← register, login, me, profile (PATCH), password
     ├── rooms/          ← CRUD + PATCH status (admin only)
     ├── guests/         ← Búsqueda + CRUD
     ├── reservations/   ← CRUD + checkin/checkout/cancel (transactions)
     ├── pos/            ← CRUD products + POST sales (transactions) + stock
     ├── billing/        ← GET invoices + GET invoice/:id + POST pay
-    └── reports/        ← GET dashboard, financial, occupancy
+    ├── expenses/       ← CRUD gastos (list all roles, create/delete admin)
+    └── reports/        ← GET dashboard, financial (?months=), occupancy
+test/
+└── global-setup.ts     ← Crea BD de test + migra + siembra admin
+vitest.config.ts        ← Config de tests (NODE_ENV=test, BD hotel_manager_test)
 ```
 
 ## Convenciones de código
@@ -135,6 +141,8 @@ await db.delete(rooms).where(eq(rooms.id, id))
 | POST | /api/auth/refresh | No | Renueva access token vía cookie refresh (7d) |
 | POST | /api/auth/logout | No | Limpia cookies de sesión |
 | GET | /api/auth/me | Sí | Datos del usuario actual |
+| PATCH | /api/auth/profile | Sí | Actualiza name / hotelName |
+| POST | /api/auth/password | Sí | Cambia contraseña (valida la actual) |
 | GET | /api/rooms | Sí | Lista habitaciones (filtros: status, floor, type) |
 | POST | /api/rooms | Admin | Crear habitación |
 | GET | /api/rooms/:id | Sí | Detalle habitación |
@@ -158,8 +166,11 @@ await db.delete(rooms).where(eq(rooms.id, id))
 | GET | /api/invoices | Sí | Lista facturas (filtros: status, guestId) |
 | GET | /api/invoices/:id | Sí | Detalle factura |
 | POST | /api/invoices/:id/pay | Sí | Pagar factura (parcial o total) |
+| GET | /api/expenses | Sí | Lista gastos (desc por fecha) |
+| POST | /api/expenses | Admin | Crear gasto |
+| DELETE | /api/expenses/:id | Admin | Eliminar gasto |
 | GET | /api/reports/dashboard | Sí | KPIs: occupancy, dailyRevenue, pendingCheckins/Checkouts |
-| GET | /api/reports/financial | Sí | Resumen financiero (filtro: month YYYY-MM) |
+| GET | /api/reports/financial | Admin | Resumen financiero (query: months 1–24, default 6) |
 | GET | /api/reports/occupancy | Sí | Ocupación por tipo (filtro: month YYYY-MM) |
 
 ## Database
@@ -168,8 +179,16 @@ await db.delete(rooms).where(eq(rooms.id, id))
 - **Pooling**: max 10 conexiones
 - **Migraciones**: `drizzle-kit generate` genera SQL, auto-apply en server start
 - **Seed**: idempotente (skip si users existen), cierra conexión al terminar
-- **Tablas**: users, rooms, guests, reservations, products, sales, invoices
-- **Foreign keys**: reservations→guests+rooms, sales→rooms, invoices→reservations+guests
+- **Tablas**: users, rooms, guests, reservations, products, sales, invoices, expenses
+- **Foreign keys**: reservations→guests+rooms, sales→rooms, invoices→reservations+guests, expenses→users (createdBy)
+
+## Testing (Vitest)
+
+- `pnpm test` ejecuta `vitest run` contra la BD **`hotel_manager_test`** (se crea y migra sola).
+- `test/global-setup.ts` crea la BD si falta (`CREATE DATABASE`), aplica migraciones, trunca tablas y siembra un admin (`admin@test.com` / `Password123!`).
+- Los tests usan `app.inject()` (fastify) sin puerto; auth vía `Authorization: Bearer`.
+- Variables: `DB_ADMIN_URL` (BD de mantenimiento) y `TEST_DATABASE_URL` (BD de test). En CI se inyectan via service de PostgreSQL.
+- El rate limiting se desactiva cuando `NODE_ENV=test`.
 
 ## Docker
 
@@ -189,10 +208,10 @@ services:
 
 ## Bruno Collection
 
-Colección de 34 requests en `backend/bruno/` para testing de API:
+Colección de 39 requests en `backend/bruno/` para testing de API:
 - Importar en Bruno → seleccionar entorno `dev` (baseUrl: localhost:3001)
 - Login automático: register/login scripts guardan `{{token}}`
-- Organizado por módulo: health/, auth/, rooms/, guests/, reservations/, pos/, billing/, reports/
+- Organizado por módulo: health/, auth/, rooms/, guests/, reservations/, pos/, billing/, reports/ (incluye gastos: list/create/delete)
 
 ## Credenciales de desarrollo
 
@@ -212,7 +231,7 @@ Colección de 34 requests en `backend/bruno/` para testing de API:
 ## Problemas conocidos
 
 - Access token 15m + refresh token 7d (cookie HttpOnly), refresh sin revocación server-side
-- Rate limiting solo en `/api/auth/login`, `/api/auth/register` y `/api/auth/refresh` (global 300/min)
+- Rate limiting solo en `/api/auth/login`, `/api/auth/register` y `/api/auth/refresh` (global 300/min), desactivado bajo `NODE_ENV=test`
 - Logging estructurado con pino + redacción de credenciales, sin correlación entre microservicios
 - Seed hardcodea datos relativos a la fecha actual (no reproducible en tests)
 - `reports/financial` no retorna `occupancyRate` (solo `totalRevenue`)

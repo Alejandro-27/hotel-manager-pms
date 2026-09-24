@@ -14,7 +14,7 @@
 pnpm dev          # Next.js dev server (localhost:3000)
 pnpm build        # Build producción
 pnpm lint         # ESLint
-pnpm test         # Vitest + React Testing Library (49 tests)
+pnpm test         # Vitest + React Testing Library (33 tests)
 ```
 
 ## Estructura
@@ -22,12 +22,12 @@ pnpm test         # Vitest + React Testing Library (49 tests)
 ```
 ├── app/
 │   ├── page.tsx            ← Página principal: controla auth + routing por view activa
-│   ├── layout.tsx          ← Root layout con ThemeProvider + Sidebar
+│   ├── layout.tsx          ← Root layout con ThemeProvider + Sidebar + Toaster de sonner
 │   ├── globals.css         ← CSS variables light/dark + estilos base
-│   └── designs/page.tsx    ← Página de mockups (solo imágenes)
+│   └── designs/page.tsx    ← Página estática de mockups (solo imágenes)
 ├── components/
 │   ├── app-sidebar.tsx     ← Sidebar de navegación (shadcn Sidebar)
-│   ├── auth-screen.tsx     ← Login/registro ficticio (validado con zod)
+│   ├── auth-screen.tsx     ← Login/registro (validado con zod, JWT real)
 │   ├── ui/                 ← ~50 componentes shadcn/ui
 │   └── views/              ← 8 vistas principales (una por módulo)
 │       ├── dashboard-view.tsx
@@ -39,11 +39,12 @@ pnpm test         # Vitest + React Testing Library (49 tests)
 │       ├── settings-view.tsx
 │       └── reports-view.tsx
 └── lib/
-    ├── store.ts            ← Datos mock + funciones helper + re-exports
+    ├── api.ts              ← Cliente de la API real (fetch + endpoints + AuthUser)
+    ├── auth-context.tsx    ← Sesión real (JWT + refresh + refreshUser)
     ├── types.ts            ← Re-export de @hotel/types (backward compat)
     ├── validations.ts      ← Schemas zod para formularios
     ├── constants.tsx       ← Configuraciones compartidas
-    └── utils.ts            ← cn(), formatCurrency()
+    └── utils.ts            ← cn(), formatCurrency(), exportToCsv()
 ```
 
 ## Convenciones
@@ -55,9 +56,8 @@ pnpm test         # Vitest + React Testing Library (49 tests)
 - No crear componentes de más de 300 líneas — dividir en sub-componentes
 
 ### Datos
-- **NO hay persistencia real** — todo es mock en `lib/store.ts`
-- Auth es ficticia (solo setTimeout, no JWT real)
-- Los datos mock simulan hotel con 20 habitaciones, ~15 huéspedes, reservas variadas
+- **Todo se consume de la API real** (Fastify + PostgreSQL) via `lib/api.ts` — sin datos mock
+- Auth real: JWT con cookies httpOnly + refresh (roles `admin`/`recepcion`)
 - Re-exportar tipos de `@hotel/types` vía `lib/types.ts`
 
 ### Estilos
@@ -76,44 +76,25 @@ pnpm test         # Vitest + React Testing Library (49 tests)
 ### Testing
 - Vitest + React Testing Library
 - Tests en `*.test.ts` junto al archivo fuente
-- 49 tests pasando (utils, validaciones, api, auth-context)
+- 33 tests pasando (utils, api, auth-context, validaciones)
 
 ## Vistas del sistema
 
 | Vista | Archivo | Descripción |
 |-------|---------|-------------|
-| Dashboard | `dashboard-view.tsx` | KPIs, gráficos de ocupación, ingresos |
+| Dashboard | `dashboard-view.tsx` | KPIs, check-in rápido, stock bajo |
 | Calendario | `calendar-view.tsx` | Vista Gantt de reservas |
-| Huéspedes | `guests-view.tsx` | Lista + wizard de reserva |
+| Huéspedes | `guests-view.tsx` | Lista (búsqueda server-side) + wizard de reserva |
 | TPV | `pos-view.tsx` | Punto de venta catering + inventario |
 | Facturación | `billing-view.tsx` | Facturas y pagos |
 | Habitaciones | `rooms-view.tsx` | Grid de habitaciones + gestión |
-| Configuración | `settings-view.tsx` | Ajustes del sistema |
-| Informes | `reports-view.tsx` | KPIs y métricas avanzadas |
-
-## Datos mock (store.ts)
-
-```ts
-// Estructura principal
-export const rooms: Room[]         // 20 habitaciones (individual, doble, suite, familiar)
-export const guests: Guest[]       // ~15 huéspedes
-export const reservations: Reservation[]  // Reservas variadas
-export const products: Product[]   // 14 productos catering
-export const sales: Sale[]         // 4 ventas de ejemplo
-export const invoices: Invoice[]   // 3 facturas de ejemplo
-
-// Funciones helper
-export function getRoomById(id: string): Room | undefined
-export function getGuestById(id: string): Guest | undefined
-export function getReservationsByDate(date: string): Reservation[]
-export function computeTotalAmount(pricePerNight: number, checkIn: string, checkOut: string): number
-```
+| Configuración | `settings-view.tsx` | Perfil, contraseña y tema (solo lo real) |
+| Informes | `reports-view.tsx` | KPIs, financiero por periodo, gastos, export CSV |
 
 ## Cosas que NO deben modificarse sin razón clara
 
 - `components/ui/` — Componentes shadcn. Solo modificar si es necesario para el diseño.
 - `app/globals.css` variables de tema — Cambiar solo con cuidado para mantener consistencia visual.
-- `lib/store.ts` estructura — Mantener la forma de los datos mock compatible con @hotel/types.
 - `lib/types.ts` — Solo re-exportar, NO definir tipos aquí.
 
 ## Reglas para añadir cosas nuevas
@@ -123,7 +104,7 @@ export function computeTotalAmount(pricePerNight: number, checkIn: string, check
 3. **Nuevo tipo de dominio** → Agregar en `packages/types/src/index.ts` (NO aquí)
 4. **Nueva función helper** → Agregar en `lib/utils.ts`
 5. **Nuevo schema zod** → Agregar en `lib/validations.ts`
-6. **Nuevo endpoint** → Agregar función mock en `lib/store.ts`
+6. **Nuevo endpoint** → Agregar cliente en `lib/api.ts` + endpoint real en `backend/src/modules/`
 
 ## Dependencias clave
 

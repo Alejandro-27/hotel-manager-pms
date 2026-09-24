@@ -2,7 +2,7 @@
 
 ## Propósito
 
-Sistema de gestión hotelera (PMS) y punto de venta (POS) para catering. Monorepo con frontend Next.js (mock data) y backend Fastify con PostgreSQL real.
+Sistema de gestión hotelera (PMS) y punto de venta (POS) para catering. Monorepo con frontend Next.js (API real) y backend Fastify con PostgreSQL real.
 
 ## Stack
 
@@ -13,7 +13,7 @@ Sistema de gestión hotelera (PMS) y punto de venta (POS) para catering. Monorep
 - **Tipos compartidos**: `@hotel/types` en `packages/types/`
 - **Package manager**: pnpm (NO npm)
 - **Testing**: Vitest + React Testing Library (frontend)
-- **API testing**: Bruno collection en `backend/bruno/` (34 requests)
+- **API testing**: Bruno collection en `backend/bruno/` (39 requests)
 
 ## Inicio rápido
 
@@ -35,7 +35,8 @@ pnpm dev:api                                  # Backend en http://localhost:3001
 | `pnpm build` | Build frontend |
 | `pnpm build:api` | Build backend (tsc → `dist/`) |
 | `pnpm lint` | ESLint frontend |
-| `pnpm test` | Vitest frontend (49 tests) |
+| `pnpm test` | Vitest frontend (33 tests) |
+| `pnpm test:api` | Vitest backend (12 tests, requiere PostgreSQL) |
 | `docker compose up -d` | Levantar PostgreSQL |
 | `pnpm --filter @hotel/backend db:migrate` | Aplicar migraciones |
 | `pnpm --filter @hotel/backend db:generate` | Generar migración desde schema |
@@ -47,15 +48,15 @@ pnpm dev:api                                  # Backend en http://localhost:3001
 ```
 packages/
 └── types/                  ← @hotel/types — tipos de dominio compartidos
-frontend/                   ← @hotel/frontend — Next.js (mock data)
+frontend/                   ← @hotel/frontend — Next.js (consume la API real)
 ├── app/
 │   ├── page.tsx            ← Página principal, controla auth + routing
-│   ├── layout.tsx          ← Root layout
+│   ├── layout.tsx          ← Root layout (+ Toaster de sonner)
 │   ├── globals.css         ← Theme variables light/dark
-│   └── designs/page.tsx    ← Página de mockups
+│   └── designs/page.tsx    ← Página estática de mockups
 ├── components/
 │   ├── app-sidebar.tsx     ← Navegación lateral
-│   ├── auth-screen.tsx     ← Login/registro (ficticio, validado con zod)
+│   ├── auth-screen.tsx     ← Login/registro (validado con zod)
 │   ├── ui/                 ← ~50 shadcn/ui components
 │   └── views/              ← 8 vistas principales del sistema
 │       ├── dashboard-view.tsx
@@ -67,33 +68,38 @@ frontend/                   ← @hotel/frontend — Next.js (mock data)
 │       ├── settings-view.tsx
 │       └── reports-view.tsx
 └── lib/
-    ├── store.ts            ← Mock data + funciones helper
+    ├── api.ts              ← Cliente de la API real (fetch + endpoints)
+    ├── auth-context.tsx    ← Sesión real (JWT + refresh)
     ├── types.ts            ← Re-export de @hotel/types (backward compat)
     ├── validations.ts      ← Schemas zod
     ├── constants.tsx       ← Configuraciones compartidas
-    └── utils.ts            ← cn(), formatCurrency()
+    └── utils.ts            ← cn(), formatCurrency(), exportToCsv()
 backend/                    ← @hotel/backend — Fastify API (PostgreSQL)
 ├── src/
 │   ├── app.ts              ← Instancia Fastify (exportada para Vercel)
 │   ├── index.ts            ← Entry point (migrate + listen)
+│   ├── api.test.ts         ← Tests de API (fastify.inject, 12 tests)
 │   ├── config/env.ts       ← Variables de entorno
 │   ├── db/
 │   │   ├── index.ts        ← Conexión PostgreSQL (postgres-js)
-│   │   ├── schema.ts       ← Schema Drizzle (7 tablas)
+│   │   ├── schema.ts       ← Schema Drizzle (8 tablas)
 │   │   ├── migrate.ts      ← Runner de migraciones
 │   │   └── seed.ts         ← Datos de ejemplo
 │   ├── plugins/
 │   │   ├── auth.ts         ← JWT plugin (authenticate + requireAdmin)
 │   │   └── error-handler.ts
 │   └── modules/
-│       ├── auth/           ← Login, registro, /me
+│       ├── auth/           ← Login, registro, /me, perfil, contraseña
 │       ├── rooms/          ← CRUD + status management
 │       ├── guests/         ← Búsqueda + CRUD
 │       ├── reservations/   ← Create, checkin, checkout, cancel
 │       ├── pos/            ← Ventas, stock, cargo a habitación
 │       ├── billing/        ← Facturas automáticas + pagos
+│       ├── expenses/       ← Gastos operativos (CRUD)
 │       └── reports/        ← Dashboard, financiero, ocupación
-├── bruno/                  ← Colección Bruno (32 requests para testing)
+├── test/global-setup.ts    ← Crea BD de test + migra + siembra admin
+├── vitest.config.ts        ← Config de tests (BD hotel_manager_test)
+├── bruno/                  ← Colección Bruno (39 requests)
 ├── drizzle/                ← Migraciones generadas
 ├── docker-compose.yml      ← PostgreSQL 16
 ├── .env                    ← Variables de entorno (NO commitear)
@@ -112,7 +118,7 @@ backend/                    ← @hotel/backend — Fastify API (PostgreSQL)
 - Vistas principales en `frontend/components/views/` — una por módulo
 - `"use client"` solo en componentes interactivos
 - Tema claro/oscuro con CSS variables en `globals.css`
-- Datos mock en `lib/store.ts` (sin persistencia real)
+- Vistas conectadas a la API real via `lib/api.ts` (sin datos mock)
 - Testing: archivos `*.test.ts` junto al fuente
 
 ### Backend
@@ -174,7 +180,7 @@ backend/                    ← @hotel/backend — Fastify API (PostgreSQL)
 ## Reglas para testing
 
 - **Frontend**: Vitest + React Testing Library, tests unitarios en `*.test.ts`
-- **Backend**: Testing manual via Bruno collection (32 requests)
+- **Backend**: Vitest (fastify.inject) contra una BD PostgreSQL dedicada (`hotel_manager_test`); testing manual con Bruno (39 requests)
 - Cobertura mínima: helpers de utilidad, lógica de negocio, componentes críticos
 
 ## Reglas para dependencias
@@ -193,7 +199,12 @@ backend/                    ← @hotel/backend — Fastify API (PostgreSQL)
 
 ## Problemas conocidos
 
-- Frontend usa datos mock solo en páginas de diseño (`/designs`); las 8 vistas usan la API real
+- Frontend usa datos estáticos solo en la página de diseño (`/designs`); las 8 vistas usan la API real
 - Backend: auth JWT con refresh tokens (cookie de 7d), pero sin revocación server-side de refresh
-- Rate limiting solo en `/api/auth/login`, `/api/auth/register` y `/api/auth/refresh`
+- Rate limiting solo en `/api/auth/login`, `/api/auth/register` y `/api/auth/refresh` (global 300/min); desactivado bajo `NODE_ENV=test`
 - Logging: pino con redacción de credenciales, sin correlación entre microservicios
+
+## CI/CD
+
+- GitHub Actions (`.github/workflows/ci.yml`): job `frontend` (lint + typecheck + build + tests) y job `backend` (build + tests contra PostgreSQL 16 de servicio)
+- Tests de backend requieren PostgreSQL; la BD de test (`hotel_manager_test`) se crea y migra sola en `test/global-setup.ts`

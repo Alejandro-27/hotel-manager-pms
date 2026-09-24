@@ -1,6 +1,7 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import fastifyCookie from '@fastify/cookie'
+import fastifyHelmet from '@fastify/helmet'
 import fastifyRateLimit from '@fastify/rate-limit'
 import { type ZodTypeProvider, validatorCompiler, serializerCompiler } from 'fastify-type-provider-zod'
 import authPlugin from './plugins/auth.js'
@@ -48,6 +49,8 @@ export function buildApp() {
   })
 
   app.register(fastifyCookie)
+
+  app.register(fastifyHelmet)
 
   app.register(errorHandlerPlugin)
   app.register(authPlugin)

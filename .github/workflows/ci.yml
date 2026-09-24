@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.6.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm --filter @hotel/frontend lint
+      - name: Typecheck
+        run: pnpm --filter @hotel/frontend exec tsc --noEmit
+      - name: Build
+        run: pnpm --filter @hotel/frontend build
+      - name: Tests
+        run: pnpm --filter @hotel/frontend test
+
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: hotel
+          POSTGRES_PASSWORD: hotel123
+          POSTGRES_DB: hotel_manager
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hotel"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.6.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Build
+        run: pnpm --filter @hotel/backend build
+      - name: Tests
+        run: pnpm --filter @hotel/backend test
+        env:
+          DB_ADMIN_URL: postgres://hotel:hotel123@localhost:5432/postgres
+          TEST_DATABASE_URL: postgres://hotel:hotel123@localhost:5432/hotel_manager_test

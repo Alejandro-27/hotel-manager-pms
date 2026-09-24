@@ -56,11 +56,13 @@ export function buildApp() {
   app.register(errorHandlerPlugin)
   app.register(authPlugin)
 
-  app.register(fastifyRateLimit, {
-    global: true,
-    max: 300,
-    timeWindow: '1 minute',
-  })
+  if (env.nodeEnv !== 'test') {
+    app.register(fastifyRateLimit, {
+      global: true,
+      max: 300,
+      timeWindow: '1 minute',
+    })
+  }
 
   app.get('/health', async () => ({ status: 'ok' }))
 

@@ -9,6 +9,7 @@
     "build:api": "pnpm --filter @hotel/backend build",
     "lint": "pnpm --filter @hotel/frontend lint",
     "test": "pnpm --filter @hotel/frontend test",
+    "test:api": "pnpm --filter @hotel/backend test",
     "test:watch": "pnpm --filter @hotel/frontend test:watch"
   }
 }

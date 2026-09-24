@@ -46,9 +46,9 @@ describe('exportToCsv', () => {
   })
 
   it('triggers a CSV download with headers and rows', () => {
-    const createObjectURL = vi.fn(() => 'blob:csv')
+    const createObjectURL = vi.fn<(obj: Blob) => string>(() => 'blob:csv')
     URL.createObjectURL = createObjectURL
-    const click = vi.fn()
+    const click = vi.fn<() => void>()
     HTMLAnchorElement.prototype.click = click
 
     exportToCsv('informe.csv', [
@@ -62,9 +62,9 @@ describe('exportToCsv', () => {
   })
 
   it('escapes commas and quotes in values', () => {
-    const createObjectURL = vi.fn(() => 'blob:csv')
+    const createObjectURL = vi.fn<(obj: Blob) => string>(() => 'blob:csv')
     URL.createObjectURL = createObjectURL
-    const click = vi.fn()
+    const click = vi.fn<() => void>()
     HTMLAnchorElement.prototype.click = click
 
     exportToCsv('informe.csv', [{ Concepto: 'Luz, agua & "extras"', Importe: '10,5' }])
@@ -75,7 +75,7 @@ describe('exportToCsv', () => {
   })
 
   it('does nothing when there are no rows', () => {
-    const createObjectURL = vi.fn()
+    const createObjectURL = vi.fn<(obj: Blob) => string>()
     URL.createObjectURL = createObjectURL
     exportToCsv('informe.csv', [])
     expect(createObjectURL).not.toHaveBeenCalled()

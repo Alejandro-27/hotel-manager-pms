@@ -1,0 +1,18 @@
+meta {
+  name: Update Profile
+  type: http
+  seq: 6
+}
+
+patch {
+  url: {{baseUrl}}/api/auth/profile
+  headers {
+    Authorization: Bearer {{token}}
+    Content-Type: application/json
+  }
+  body: json
+  {
+    "name": "Administrador",
+    "hotelName": "Gran Hotel Central"
+  }
+}

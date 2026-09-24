@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs'
 import { db } from '../../db/index.js'
 import { users } from '../../db/schema.js'
 import { AppError } from '../../plugins/error-handler.js'
-import type { LoginInput, RegisterInput } from './schemas.js'
+import type { LoginInput, RegisterInput, UpdateProfileInput } from './schemas.js'
 import type { AuthUser } from '../../plugins/auth.js'
 
 export interface PublicUser {
@@ -76,4 +76,30 @@ export async function getMe(userId: string): Promise<PublicUser> {
   const user = (await db.select().from(users).where(eq(users.id, userId)).limit(1))[0]
   if (!user) throw new AppError(404, 'Usuario no encontrado')
   return toPublicUser(user)
+}
+
+export async function updateProfile(userId: string, input: UpdateProfileInput): Promise<PublicUser> {
+  const existing = (await db.select().from(users).where(eq(users.id, userId)).limit(1))[0]
+  if (!existing) throw new AppError(404, 'Usuario no encontrado')
+
+  const changes: Record<string, string | null> = { updatedAt: new Date().toISOString() }
+  if (input.name !== undefined) changes.name = input.name
+  if (input.hotelName !== undefined) changes.hotelName = input.hotelName
+
+  await db.update(users).set(changes).where(eq(users.id, userId))
+  const updated = (await db.select().from(users).where(eq(users.id, userId)).limit(1))[0]
+  if (!updated) throw new AppError(500, 'Error actualizando perfil')
+
+  return toPublicUser(updated)
+}
+
+export async function changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+  const user = (await db.select().from(users).where(eq(users.id, userId)).limit(1))[0]
+  if (!user) throw new AppError(404, 'Usuario no encontrado')
+
+  const valid = await bcrypt.compare(currentPassword, user.passwordHash)
+  if (!valid) throw new AppError(400, 'La contraseña actual no es correcta')
+
+  const passwordHash = await bcrypt.hash(newPassword, 10)
+  await db.update(users).set({ passwordHash, updatedAt: new Date().toISOString() }).where(eq(users.id, userId))
 }

@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
-import { register, login, buildAuthUser, getMe } from './service.js'
-import { registerSchema, loginSchema } from './schemas.js'
+import { register, login, buildAuthUser, getMe, updateProfile, changePassword } from './service.js'
+import { registerSchema, loginSchema, updateProfileSchema, changePasswordSchema } from './schemas.js'
 import type { AuthUser } from '../../plugins/auth.js'
 import { env } from '../../config/env.js'
 
@@ -87,5 +87,21 @@ export default async function authRoutes(app: FastifyInstance) {
   typedApp.get('/api/auth/me', { preHandler: [app.authenticate] }, async (req, reply) => {
     const user = await getMe(req.authUser.sub)
     reply.send(user)
+  })
+
+  typedApp.patch('/api/auth/profile', {
+    preHandler: [app.authenticate],
+    schema: { body: updateProfileSchema },
+  }, async (req, reply) => {
+    const user = await updateProfile(req.authUser.sub, req.body)
+    reply.send(user)
+  })
+
+  typedApp.post('/api/auth/password', {
+    preHandler: [app.authenticate],
+    schema: { body: changePasswordSchema },
+  }, async (req, reply) => {
+    await changePassword(req.authUser.sub, req.body.currentPassword, req.body.newPassword)
+    reply.send({ ok: true })
   })
 }

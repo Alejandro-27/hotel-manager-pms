@@ -133,6 +133,10 @@ export const api = {
     me: () => request<AuthUser>('/api/auth/me'),
     logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
     refresh: () => doRequest<AuthResponse>('/api/auth/refresh', { method: 'POST' }),
+    updateProfile: (data: { name?: string; hotelName?: string | null }) =>
+      request<AuthUser>('/api/auth/profile', { method: 'PATCH', body: JSON.stringify(data) }),
+    changePassword: (data: { currentPassword: string; newPassword: string }) =>
+      request<{ ok: boolean }>('/api/auth/password', { method: 'POST', body: JSON.stringify(data) }),
   },
 
   rooms: {

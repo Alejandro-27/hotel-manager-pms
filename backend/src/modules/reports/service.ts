@@ -45,10 +45,10 @@ export async function getDashboard() {
   }
 }
 
-export async function getFinancialReport() {
+export async function getFinancialReport(months = 6) {
   const monthly = []
 
-  for (let offset = 5; offset >= 0; offset--) {
+  for (let offset = months - 1; offset >= 0; offset--) {
     const start = monthStart(offset)
     const end = monthStart(offset - 1)
 

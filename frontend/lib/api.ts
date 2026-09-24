@@ -208,7 +208,7 @@ export const api = {
 
   reports: {
     dashboard: () => request<DashboardReport>('/api/reports/dashboard'),
-    financial: () => request<FinancialReport>('/api/reports/financial'),
+    financial: (months = 6) => request<FinancialReport>(`/api/reports/financial?months=${months}`),
     occupancy: () => request<OccupancyReport>('/api/reports/occupancy'),
   },
 }

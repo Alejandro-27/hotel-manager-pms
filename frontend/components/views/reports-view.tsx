@@ -53,6 +53,7 @@ import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Pie, PieChart, Cell } from 
 import { api, type FinancialReport, type OccupancyReport } from "@/lib/api"
 import { useAuth } from "@/lib/auth-context"
 import type { Invoice, Reservation, Room, Guest, Product, Sale, Expense } from "@/lib/types"
+import { exportToCsv } from "@/lib/utils"
 import { formatCurrency } from "@/lib/utils"
 
 const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
@@ -116,6 +117,7 @@ export function ReportsView() {
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
   const [period, setPeriod] = useState("6m")
+  const periodMonths: Record<string, number> = { "1m": 1, "3m": 3, "6m": 6, "1y": 12 }
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -152,7 +154,7 @@ export function ReportsView() {
         api.sales.get(),
         api.invoices.get(),
         api.reports.occupancy(),
-        isAdmin ? api.reports.financial() : Promise.resolve(null),
+        isAdmin ? api.reports.financial(periodMonths[period] ?? 6) : Promise.resolve(null),
         isAdmin ? api.expenses.get() : Promise.resolve([] as Expense[]),
       ])
       const [r, g, res, p, s, inv, occ, fin, exp] = await base
@@ -170,7 +172,7 @@ export function ReportsView() {
     } finally {
       setLoading(false)
     }
-  }, [isAdmin])
+  }, [isAdmin, period])
 
   useEffect(() => {
     fetchData()
@@ -327,6 +329,19 @@ export function ReportsView() {
     }
   }
 
+  function handleExport() {
+    if (monthlyRevenue.length === 0) return
+    exportToCsv(
+      `informe-financiero-${new Date().toISOString().slice(0, 10)}.csv`,
+      monthlyRevenue.map((m) => ({
+        Mes: m.month,
+        Ingresos: m.ingresos,
+        Gastos: m.gastos,
+        Beneficio: m.ingresos - m.gastos,
+      })),
+    )
+  }
+
   if (loading) {
     return (
       <div className="flex flex-col gap-6">
@@ -357,24 +372,26 @@ export function ReportsView() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Informes y KPIs</h1>
           <p className="text-muted-foreground text-sm">Metricas de rendimiento y analisis del hotel</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Select value={period} onValueChange={setPeriod}>
-            <SelectTrigger className="w-40 h-9">
-              <Calendar className="mr-1 size-3" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="1m">Ultimo mes</SelectItem>
-              <SelectItem value="3m">Ultimos 3 meses</SelectItem>
-              <SelectItem value="6m">Ultimos 6 meses</SelectItem>
-              <SelectItem value="1y">Ultimo ano</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button variant="outline" size="sm">
-            <Download className="mr-1 size-3" />
-            Exportar
-          </Button>
-        </div>
+        {isAdmin && (
+          <div className="flex items-center gap-2">
+            <Select value={period} onValueChange={setPeriod}>
+              <SelectTrigger className="w-40 h-9">
+                <Calendar className="mr-1 size-3" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1m">Ultimo mes</SelectItem>
+                <SelectItem value="3m">Ultimos 3 meses</SelectItem>
+                <SelectItem value="6m">Ultimos 6 meses</SelectItem>
+                <SelectItem value="1y">Ultimo ano</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="sm" onClick={handleExport}>
+              <Download className="mr-1 size-3" />
+              Exportar
+            </Button>
+          </div>
+        )}
       </div>
 
       {error && (

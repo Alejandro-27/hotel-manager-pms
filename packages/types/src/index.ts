@@ -43,6 +43,7 @@ export interface Product {
   currentStock: number
   minStock: number
   image: string
+  active: boolean
 }
 
 export interface SaleItem {

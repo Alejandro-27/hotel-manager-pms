@@ -77,7 +77,7 @@ async function doRequest<T>(endpoint: string, options: RequestInit = {}): Promis
   const res = await fetch(`${API_BASE}${endpoint}`, {
     credentials: 'include',
     headers: {
-      'Content-Type': 'application/json',
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
       ...options.headers,
     },
     ...options,
@@ -197,6 +197,7 @@ export const api = {
         currentStock: number
         minStock: number
         image: string
+        active: boolean
       }>,
     ) => request<Product>(`/api/products/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     remove: (id: string) => request<null>(`/api/products/${id}`, { method: 'DELETE' }),

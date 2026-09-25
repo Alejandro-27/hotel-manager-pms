@@ -35,6 +35,45 @@ describe('manejo de respuestas no-OK', () => {
   })
 })
 
+describe('Content-Type en peticiones', () => {
+  it('no envia Content-Type en peticiones sin body (DELETE/PATCH bodiless)', async () => {
+    mockFetch.mockResolvedValue(jsonResponse(null, 204))
+
+    await api.products.remove('p1')
+    await api.reservations.checkin('r1')
+    await Promise.all([
+      api.reservations.checkout('r2'),
+      api.reservations.cancel('r3'),
+      api.expenses.remove('e1'),
+      api.auth.logout(),
+      api.auth.refresh(),
+    ])
+
+    const requests = mockFetch.mock.calls as [string, RequestInit][]
+    expect(requests.length).toBeGreaterThan(0)
+    for (const call of requests) {
+      const headers = (call[1]?.headers ?? {}) as Record<string, string>
+      expect(headers['Content-Type']).toBeUndefined()
+    }
+  })
+
+  it('envia Content-Type cuando la peticion lleva body', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ id: 'p1' }, 200))
+
+    await api.products.create({
+      name: 'Cafe',
+      category: 'bebidas',
+      price: 1500,
+      currentStock: 20,
+      minStock: 5,
+    })
+
+    const call = mockFetch.mock.calls[0] as [string, RequestInit]
+    const headers = (call[1]?.headers ?? {}) as Record<string, string>
+    expect(headers['Content-Type']).toBe('application/json')
+  })
+})
+
 describe('evento de sesión expirada y refresh', () => {
   it('dispara session-expired al recibir 401 en endpoint protegido y no poder refrescar', async () => {
     const listener = vi.fn()

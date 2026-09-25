@@ -19,7 +19,6 @@ import {
 } from "@/components/ui/dialog"
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -59,11 +58,18 @@ import {
   RefreshCw,
   Search,
   Pencil,
+  Power,
+  PowerOff,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react"
+import { toast } from "sonner"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth-context"
 import type { Product, Reservation, Guest, Room, SaleItem } from "@/lib/types"
 import { formatCurrency } from "@/lib/utils"
+import { productFormSchema } from "@/lib/validations"
 
 type ProductCategory = "desayunos" | "snacks" | "bebidas"
 type PaymentMethod = "efectivo" | "tarjeta" | "cargo_habitacion"
@@ -173,6 +179,10 @@ export function PosView() {
     setSelectedRoom("")
   }
 
+  function handleProductDeleted(id: string) {
+    setCart((prev) => prev.filter((i) => i.product.id !== id))
+  }
+
   async function handleCharge() {
     if (cart.length === 0) return
     setCharging(true)
@@ -268,6 +278,7 @@ export function PosView() {
             isAdmin={user?.role === "admin"}
             onChanged={fetchData}
             onError={setActionError}
+            onProductDeleted={handleProductDeleted}
           />
         </TabsContent>
       </Tabs>
@@ -286,10 +297,11 @@ function ProductGrid({
   cart: CartItem[]
   onAdd: (product: Product) => void
 }) {
+  const activeProducts = products.filter((p) => p.active)
   return (
     <div className="flex flex-col gap-4">
       {categories.map((category) => {
-        const categoryProducts = products.filter((p) => p.category === category)
+        const categoryProducts = activeProducts.filter((p) => p.category === category)
         const categoryLabel = category.charAt(0).toUpperCase() + category.slice(1)
         return (
           <div key={category}>
@@ -514,47 +526,122 @@ function CartSidebar({
 
 // ---------- Inventory Table ----------
 
+type SortKey = "name" | "price" | "currentStock" | "minStock"
+
+function SortableHead({
+  label,
+  sortKey,
+  current,
+  dir,
+  onSort,
+  className,
+}: {
+  label: string
+  sortKey: SortKey
+  current: SortKey
+  dir: "asc" | "desc"
+  onSort: (key: SortKey) => void
+  className?: string
+}) {
+  const activeSort = current === sortKey
+  return (
+    <TableHead className={className}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className="inline-flex items-center gap-1 whitespace-nowrap transition-colors hover:text-foreground"
+      >
+        {label}
+        {activeSort ? (
+          dir === "asc" ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />
+        ) : (
+          <ArrowUpDown className="size-3 opacity-40" />
+        )}
+      </button>
+    </TableHead>
+  )
+}
+
 function InventoryTable({
   products,
   isAdmin,
   onChanged,
   onError,
+  onProductDeleted,
 }: {
   products: Product[]
   isAdmin: boolean
   onChanged: () => void
   onError: (msg: string | null) => void
+  onProductDeleted?: (id: string) => void
 }) {
   const [stockMap, setStockMap] = useState<Record<string, number>>(() =>
     Object.fromEntries(products.map((p) => [p.id, p.currentStock]))
   )
   const [saving, setSaving] = useState<string | null>(null)
+  const [toggling, setToggling] = useState<string | null>(null)
   const [query, setQuery] = useState("")
+  const [categoryFilter, setCategoryFilter] = useState<ProductCategory | "all">("all")
+  const [sortKey, setSortKey] = useState<SortKey>("name")
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
   const [dialog, setDialog] = useState<{ mode: "create" } | { mode: "edit"; product: Product } | null>(null)
   const [deleting, setDeleting] = useState<Product | null>(null)
   const [deletingLoading, setDeletingLoading] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   useEffect(() => {
     setStockMap(Object.fromEntries(products.map((p) => [p.id, p.currentStock])))
   }, [products])
 
-  const filtered = useMemo(() => {
+  const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return products
-    return products.filter((p) => {
-      const estado = (stockMap[p.id] ?? p.currentStock) < p.minStock ? "stock bajo" : "ok"
-      const haystack = [p.name, p.category, String(p.price), String(stockMap[p.id] ?? p.currentStock), String(p.minStock), estado]
+    const rows = products.filter((p) => {
+      if (categoryFilter !== "all" && p.category !== categoryFilter) return false
+      if (!q) return true
+      const stock = stockMap[p.id] ?? p.currentStock
+      const estado = !p.active
+        ? "inactivo"
+        : stock < p.minStock
+          ? "stock bajo"
+          : "ok"
+      const haystack = [p.name, p.category, String(p.price), String(stock), String(p.minStock), estado]
         .join(" ")
         .toLowerCase()
       return haystack.includes(q)
     })
-  }, [products, query, stockMap])
 
-  async function handleSave(id: string) {
+    const dir = sortDir === "asc" ? 1 : -1
+    return rows.slice().sort((a, b) => {
+      switch (sortKey) {
+        case "name":
+          return a.name.localeCompare(b.name) * dir
+        case "price":
+          return (a.price - b.price) * dir
+        case "currentStock":
+          return ((stockMap[a.id] ?? a.currentStock) - (stockMap[b.id] ?? b.currentStock)) * dir
+        case "minStock":
+          return (a.minStock - b.minStock) * dir
+        default:
+          return 0
+      }
+    })
+  }, [products, query, stockMap, sortKey, sortDir, categoryFilter])
+
+  function handleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"))
+    } else {
+      setSortKey(key)
+      setSortDir("asc")
+    }
+  }
+
+  async function handleSave(id: string, value: number) {
     setSaving(id)
     onError(null)
     try {
-      await api.products.updateStock(id, stockMap[id])
+      await api.products.updateStock(id, value)
+      toast.success("Stock actualizado")
       onChanged()
     } catch (err) {
       onError(err instanceof Error ? err.message : "Error al actualizar stock")
@@ -566,15 +653,31 @@ function InventoryTable({
   async function handleDelete() {
     if (!deleting) return
     setDeletingLoading(true)
-    onError(null)
+    setDeleteError(null)
     try {
       await api.products.remove(deleting.id)
+      toast.success("Producto eliminado")
       setDeleting(null)
       onChanged()
+      onProductDeleted?.(deleting.id)
     } catch (err) {
-      onError(err instanceof Error ? err.message : "Error al eliminar el producto")
+      setDeleteError(err instanceof Error ? err.message : "Error al eliminar el producto")
     } finally {
       setDeletingLoading(false)
+    }
+  }
+
+  async function handleToggleActive(product: Product) {
+    setToggling(product.id)
+    onError(null)
+    try {
+      const updated = await api.products.update(product.id, { active: !product.active })
+      toast.success(updated.active ? "Producto activado" : "Producto desactivado")
+      onChanged()
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Error al cambiar el estado del producto")
+    } finally {
+      setToggling(null)
     }
   }
 
@@ -587,7 +690,7 @@ function InventoryTable({
           <CardTitle className="flex items-center gap-2 text-foreground">
             <Package className="size-4" />
             Inventario de Productos
-            <Badge variant="secondary" className="text-xs">{filtered.length}</Badge>
+            <Badge variant="secondary" className="text-xs">{visible.length}</Badge>
           </CardTitle>
           <div className="flex items-center gap-3">
             <div className="relative w-full max-w-xs">
@@ -599,6 +702,20 @@ function InventoryTable({
                 className="pl-9 h-9"
               />
             </div>
+            <Select
+              value={categoryFilter}
+              onValueChange={(v) => setCategoryFilter(v as ProductCategory | "all")}
+            >
+              <SelectTrigger className="w-36 h-9">
+                <SelectValue placeholder="Categoria" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {categories.map((c) => (
+                  <SelectItem key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {isAdmin && (
               <Button size="sm" onClick={() => setDialog({ mode: "create" })}>
                 <Plus className="mr-1 size-4" />
@@ -612,29 +729,32 @@ function InventoryTable({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Producto</TableHead>
+                  <SortableHead label="Producto" sortKey="name" current={sortKey} dir={sortDir} onSort={handleSort} />
                   <TableHead>Categoria</TableHead>
-                  <TableHead>Precio</TableHead>
-                  <TableHead>Stock Actual</TableHead>
-                  <TableHead>Stock Minimo</TableHead>
+                  <SortableHead label="Precio" sortKey="price" current={sortKey} dir={sortDir} onSort={handleSort} />
+                  <SortableHead label="Stock Actual" sortKey="currentStock" current={sortKey} dir={sortDir} onSort={handleSort} />
+                  <SortableHead label="Stock Minimo" sortKey="minStock" current={sortKey} dir={sortDir} onSort={handleSort} />
                   <TableHead>Estado</TableHead>
                   {isAdmin && <TableHead>Acciones</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.length === 0 ? (
+                {visible.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={colSpan} className="h-24 text-center text-muted-foreground">
                       {products.length === 0
                         ? "No hay productos en el inventario. Crea el primero con el boton Nuevo Producto."
-                        : "No hay productos que coincidan con la busqueda."}
+                        : "No hay productos que coincidan con la busqueda o el filtro."}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map((product) => {
-                    const isLow = (stockMap[product.id] ?? product.currentStock) < product.minStock
+                  visible.map((product) => {
+                    const stockVal = stockMap[product.id] ?? product.currentStock
+                    const stockInvalid = Number.isNaN(stockVal) || !Number.isInteger(stockVal) || stockVal < 0
+                    const stockDirty = stockVal !== product.currentStock
+                    const isLow = !stockInvalid && stockVal < product.minStock
                     return (
-                      <TableRow key={product.id}>
+                      <TableRow key={product.id} className={!product.active ? "opacity-60" : undefined}>
                         <TableCell className="font-medium text-foreground">{product.name}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className="capitalize text-xs">
@@ -647,18 +767,21 @@ function InventoryTable({
                             <Input
                               type="number"
                               min="0"
-                              value={stockMap[product.id] ?? product.currentStock}
-                              onChange={(e) =>
-                                setStockMap((prev) => ({ ...prev, [product.id]: Number(e.target.value) }))
-                              }
-                              className="w-20 h-8 text-sm"
+                              value={Number.isNaN(stockVal) ? "" : stockVal}
+                              onChange={(e) => {
+                                const raw = e.target.value
+                                const n = raw === "" ? Number.NaN : Number(raw)
+                                setStockMap((prev) => ({ ...prev, [product.id]: n }))
+                              }}
+                              className={`w-20 h-8 text-sm ${stockInvalid ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                              aria-invalid={stockInvalid}
                             />
                             <Button
                               variant="ghost"
                               size="icon"
                               className="size-8"
-                              disabled={saving === product.id}
-                              onClick={() => handleSave(product.id)}
+                              disabled={saving === product.id || stockInvalid || !stockDirty}
+                              onClick={() => handleSave(product.id, stockVal)}
                             >
                               {saving === product.id ? (
                                 <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
@@ -674,7 +797,9 @@ function InventoryTable({
                         </TableCell>
                         <TableCell className="text-muted-foreground">{product.minStock}</TableCell>
                         <TableCell>
-                          {isLow ? (
+                          {!product.active ? (
+                            <Badge variant="outline" className="text-xs text-muted-foreground">Inactivo</Badge>
+                          ) : isLow ? (
                             <Badge variant="destructive" className="text-xs">Stock bajo</Badge>
                           ) : (
                             <Badge variant="secondary" className="text-xs">OK</Badge>
@@ -683,6 +808,26 @@ function InventoryTable({
                         {isAdmin && (
                           <TableCell>
                             <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="size-8"
+                                disabled={toggling === product.id}
+                                onClick={() => handleToggleActive(product)}
+                                title={product.active ? "Desactivar producto" : "Activar producto"}
+                              >
+                                {toggling === product.id ? (
+                                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                  </svg>
+                                ) : product.active ? (
+                                  <PowerOff className="size-4" />
+                                ) : (
+                                  <Power className="size-4 text-primary" />
+                                )}
+                                <span className="sr-only">{product.active ? "Desactivar" : "Activar"}</span>
+                              </Button>
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -696,7 +841,10 @@ function InventoryTable({
                                 variant="ghost"
                                 size="icon"
                                 className="size-8 text-destructive hover:text-destructive"
-                                onClick={() => setDeleting(product)}
+                                onClick={() => {
+                                  setDeleteError(null)
+                                  setDeleting(product)
+                                }}
                               >
                                 <Trash2 className="size-4" />
                                 <span className="sr-only">Eliminar</span>
@@ -722,24 +870,33 @@ function InventoryTable({
         onSaved={onChanged}
       />
 
-      <AlertDialog open={deleting !== null} onOpenChange={(open) => { if (!open) setDeleting(null) }}>
+      <AlertDialog
+        open={deleting !== null}
+        onOpenChange={(open) => { if (!open && !deletingLoading) setDeleting(null) }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="text-foreground">Eliminar producto</AlertDialogTitle>
             <AlertDialogDescription>
               ¿Seguro que quieres eliminar "{deleting?.name}" del inventario? Esta accion no se puede deshacer.
-              El historial de ventas no se vera afectado.
+              Si el producto tiene historial de ventas, tendras que desactivarlo en su lugar.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {deleteError && (
+            <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <span>{deleteError}</span>
+            </div>
+          )}
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
+            <AlertDialogCancel disabled={deletingLoading}>Cancelar</AlertDialogCancel>
+            <Button
+              variant="destructive"
               onClick={handleDelete}
               disabled={deletingLoading}
-              className="bg-destructive text-white hover:bg-destructive/90"
             >
               {deletingLoading ? "Eliminando..." : "Eliminar"}
-            </AlertDialogAction>
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -791,25 +948,29 @@ function ProductFormDialog({
   const isEdit = mode === "edit"
 
   async function handleSubmit() {
-    const price = Number(form.price)
-    if (!form.name.trim() || Number.isNaN(price) || price < 0) {
-      setError("Introduce un nombre y un precio valido")
+    const parsed = productFormSchema.safeParse(form)
+    if (!parsed.success) {
+      const first = parsed.error.issues[0]?.message
+      setError(first ? first : "Revisa los campos del formulario")
       return
     }
+    const data = parsed.data
     setSaving(true)
     setError(null)
     try {
       const body = {
-        name: form.name.trim(),
-        category: form.category,
-        price,
-        currentStock: Number(form.currentStock) || 0,
-        minStock: Number(form.minStock) || 0,
+        name: data.name,
+        category: data.category,
+        price: Number(data.price),
+        currentStock: Number(data.currentStock),
+        minStock: Number(data.minStock),
       }
       if (isEdit && product) {
         await api.products.update(product.id, body)
+        toast.success("Producto actualizado")
       } else {
         await api.products.create(body)
+        toast.success("Producto creado")
       }
       onSaved()
       onOpenChange(false)

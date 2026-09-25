@@ -84,6 +84,7 @@ interface Product {
   currentStock: number
   minStock: number
   image: string
+  active: boolean           // false = desactivado (no se vende ni aparece en el grid del POS)
   createdAt: string
 }
 type ProductCategory = 'desayunos' | 'snacks' | 'bebidas'

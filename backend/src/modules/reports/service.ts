@@ -35,7 +35,7 @@ export async function getDashboard() {
     .orderBy(desc(reservations.checkIn))
 
   const lowStockProducts = (await db.select().from(products))
-    .filter(p => p.currentStock < p.minStock)
+    .filter(p => p.active && p.currentStock < p.minStock)
 
   return {
     occupancyRate,

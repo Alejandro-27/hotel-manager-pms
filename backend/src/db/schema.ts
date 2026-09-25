@@ -1,4 +1,4 @@
-import { pgTable, text, integer, real, jsonb } from 'drizzle-orm/pg-core'
+import { pgTable, text, integer, real, jsonb, boolean } from 'drizzle-orm/pg-core'
 
 export const users = pgTable('users', {
   id: text('id').primaryKey(),
@@ -57,6 +57,7 @@ export const products = pgTable('products', {
   currentStock: integer('current_stock').notNull().default(0),
   minStock: integer('min_stock').notNull().default(0),
   image: text('image').notNull().default(''),
+  active: boolean('active').notNull().default(true),
   createdAt: text('created_at').notNull(),
 })
 

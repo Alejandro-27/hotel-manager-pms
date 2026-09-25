@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import { asc, desc, eq } from 'drizzle-orm'
+import { asc, desc, eq, sql } from 'drizzle-orm'
 import type { Product as ProductType } from '@hotel/types'
 import { db } from '../../db/index.js'
-import { products, rooms, sales } from '../../db/schema.js'
+import { products, rooms, sales, invoices } from '../../db/schema.js'
 import { AppError } from '../../plugins/error-handler.js'
 import type { CreateProductInput, CreateSaleInput, UpdateProductInput, UpdateStockInput } from './schemas.js'
 
@@ -39,6 +39,19 @@ export async function updateProduct(id: string, input: UpdateProductInput) {
 
 export async function deleteProduct(id: string) {
   await getProductById(id)
+
+  const ref = JSON.stringify([{ productId: id }])
+  const saleHit = (
+    await db.select().from(sales).where(sql`${sales.items} @> ${ref}::jsonb`).limit(1)
+  )[0]
+  const invoiceHit = (
+    await db.select().from(invoices).where(sql`${invoices.cateringCharges} @> ${ref}::jsonb`).limit(1)
+  )[0]
+
+  if (saleHit || invoiceHit) {
+    throw new AppError(409, 'El producto tiene historial de ventas; desactivalo en lugar de eliminarlo')
+  }
+
   await db.delete(products).where(eq(products.id, id))
 }
 
@@ -60,6 +73,9 @@ export async function createSale(input: CreateSaleInput) {
       const product = (await tx.select().from(products).where(eq(products.id, item.productId)).limit(1))[0]
       if (!product) {
         throw new AppError(404, `Producto ${item.productId} no encontrado`)
+      }
+      if (!product.active) {
+        throw new AppError(409, `El producto ${product.name} esta desactivado y no se puede vender`)
       }
       if (item.quantity > product.currentStock) {
         throw new AppError(409, `Stock insuficiente de ${product.name}: disponible ${product.currentStock}, pedido ${item.quantity}`)

@@ -28,7 +28,7 @@ pnpm test             # Vitest (fastify.inject contra BD hotel_manager_test)
 src/
 ├── app.ts              ← buildApp(): Fastify + CORS + plugins + rutas (exportado para Vercel)
 ├── index.ts            ← migrate on boot + listen (PORT 3001)
-├── api.test.ts         ← Tests de API (fastify.inject, 14 tests)
+├── api.test.ts         ← Tests de API (fastify.inject, 17 tests)
 ├── config/env.ts       ← DATABASE_URL, JWT_SECRET, PORT, CORS_ORIGIN
 ├── db/
 │   ├── index.ts        ← postgres client (pool max: 10) + drizzle instance
@@ -158,10 +158,10 @@ await db.delete(rooms).where(eq(rooms.id, id))
 | PATCH | /api/reservations/:id/checkin | Sí | Check-in → room ocupada |
 | PATCH | /api/reservations/:id/checkout | Sí | Check-out → room libre + factura auto |
 | PATCH | /api/reservations/:id/cancel | Sí | Cancelar reserva |
-| GET | /api/products | Sí | Lista productos (filtro: category) |
-| POST | /api/products | Admin | Crear producto |
-| PATCH | /api/products/:id | Admin | Editar producto (cualquier campo) |
-| DELETE | /api/products/:id | Admin | Eliminar producto (historial de ventas intacto) |
+| GET | /api/products | Sí | Lista productos (filtro: category, campo active) |
+| POST | /api/products | Admin | Crear producto (activo por defecto) |
+| PATCH | /api/products/:id | Admin | Editar producto (cualquier campo, incluido active) |
+| DELETE | /api/products/:id | Admin | Eliminar producto. 409 si tiene historial de ventas (desactivar en su lugar) |
 | PATCH | /api/products/:id/stock | Sí | Actualizar stock |
 | POST | /api/sales | Sí | Registrar venta (decrementa stock, transaction) |
 | GET | /api/sales | Sí | Lista ventas (filtro: date) |

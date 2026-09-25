@@ -328,6 +328,96 @@ describe('reservas y productos', () => {
   })
 })
 
+describe('ciclo de vida de productos', () => {
+  async function createProduct(name: string): Promise<string> {
+    const adminToken = await loginAsAdmin()
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/products',
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { name, category: 'bebidas', price: 3, currentStock: 10, minStock: 2, image: '' },
+    })
+    expect(res.statusCode).toBe(201)
+    return (res.json() as { id: string }).id
+  }
+
+  it('un PATCH parcial no pisa los campos no enviados', async () => {
+    const adminToken = await loginAsAdmin()
+    const id = await createProduct(`Agua-${Date.now()}`)
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/products/${id}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { name: 'Agua mineral' },
+    })
+    expect(res.statusCode).toBe(200)
+
+    const body = res.json() as { name: string; price: number; currentStock: number; minStock: number }
+    expect(body.name).toBe('Agua mineral')
+    expect(body.price).toBe(3)
+    expect(body.currentStock).toBe(10)
+    expect(body.minStock).toBe(2)
+  })
+
+  it('bloquea el borrado con 409 si el producto tiene historial de ventas', async () => {
+    const adminToken = await loginAsAdmin()
+    const id = await createProduct(`Jugo-${Date.now()}`)
+
+    const sale = await app.inject({
+      method: 'POST',
+      url: '/api/sales',
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { items: [{ productId: id, quantity: 1, unitPrice: 3 }], paymentMethod: 'efectivo' },
+    })
+    expect(sale.statusCode).toBe(201)
+
+    const del = await app.inject({
+      method: 'DELETE',
+      url: `/api/products/${id}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    })
+    expect(del.statusCode).toBe(409)
+
+    const delAgain = await app.inject({
+      method: 'DELETE',
+      url: `/api/products/${id}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    })
+    expect(delAgain.statusCode).toBe(409)
+
+    const list = await app.inject({
+      method: 'GET',
+      url: '/api/products',
+      headers: { authorization: `Bearer ${adminToken}` },
+    })
+    const products = list.json() as { id: string }[]
+    expect(products.some((p) => p.id === id)).toBe(true)
+  })
+
+  it('rechaza vender un producto desactivado', async () => {
+    const adminToken = await loginAsAdmin()
+    const id = await createProduct(`Inactivo-${Date.now()}`)
+
+    const deactivate = await app.inject({
+      method: 'PATCH',
+      url: `/api/products/${id}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { active: false },
+    })
+    expect(deactivate.statusCode).toBe(200)
+    expect((deactivate.json() as { active: boolean }).active).toBe(false)
+
+    const sale = await app.inject({
+      method: 'POST',
+      url: '/api/sales',
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { items: [{ productId: id, quantity: 1, unitPrice: 3 }], paymentMethod: 'efectivo' },
+    })
+    expect(sale.statusCode).toBe(409)
+  })
+})
+
 describe('cors', () => {
   it('acepta un origin con barra final', async () => {
     const res = await app.inject({

@@ -43,3 +43,22 @@ export const reservationSchema = z.object({
 })
 
 export type ReservationFormData = z.infer<typeof reservationSchema>
+
+export const productFormSchema = z.object({
+  name: z.string().trim().min(2, 'Introduce un nombre válido (mínimo 2 caracteres)'),
+  category: z.enum(['desayunos', 'snacks', 'bebidas']),
+  price: z.string().refine(
+    (v) => v.trim() !== '' && !Number.isNaN(Number(v)) && Number(v) >= 0,
+    'Introduce un precio válido'
+  ),
+  currentStock: z.string().refine(
+    (v) => v.trim() !== '' && Number.isInteger(Number(v)) && Number(v) >= 0,
+    'El stock actual debe ser un número entero no negativo'
+  ),
+  minStock: z.string().refine(
+    (v) => v.trim() !== '' && Number.isInteger(Number(v)) && Number(v) >= 0,
+    'El stock mínimo debe ser un número entero no negativo'
+  ),
+})
+
+export type ProductFormData = z.infer<typeof productFormSchema>

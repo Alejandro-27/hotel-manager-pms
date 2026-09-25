@@ -14,7 +14,7 @@
 pnpm dev          # Next.js dev server (localhost:3000)
 pnpm build        # Build producción
 pnpm lint         # ESLint
-pnpm test         # Vitest + React Testing Library (33 tests)
+pnpm test         # Vitest + React Testing Library (35 tests)
 ```
 
 ## Estructura
@@ -76,7 +76,7 @@ pnpm test         # Vitest + React Testing Library (33 tests)
 ### Testing
 - Vitest + React Testing Library
 - Tests en `*.test.ts` junto al archivo fuente
-- 33 tests pasando (utils, api, auth-context, validaciones)
+- 35 tests pasando (utils, api, auth-context, validaciones)
 
 ## Vistas del sistema
 

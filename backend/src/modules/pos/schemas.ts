@@ -16,6 +16,7 @@ export const updateProductSchema = z.object({
   currentStock: z.number().int().min(0).optional(),
   minStock: z.number().int().min(0).optional(),
   image: z.string().optional(),
+  active: z.boolean().optional(),
 })
 
 export const updateStockSchema = z.object({

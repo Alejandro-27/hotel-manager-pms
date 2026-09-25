@@ -28,7 +28,7 @@ pnpm test             # Vitest (fastify.inject contra BD hotel_manager_test)
 src/
 ├── app.ts              ← buildApp(): Fastify + CORS + plugins + rutas (exportado para Vercel)
 ├── index.ts            ← migrate on boot + listen (PORT 3001)
-├── api.test.ts         ← Tests de API (fastify.inject, 12 tests)
+├── api.test.ts         ← Tests de API (fastify.inject, 14 tests)
 ├── config/env.ts       ← DATABASE_URL, JWT_SECRET, PORT, CORS_ORIGIN
 ├── db/
 │   ├── index.ts        ← postgres client (pool max: 10) + drizzle instance
@@ -160,7 +160,9 @@ await db.delete(rooms).where(eq(rooms.id, id))
 | PATCH | /api/reservations/:id/cancel | Sí | Cancelar reserva |
 | GET | /api/products | Sí | Lista productos (filtro: category) |
 | POST | /api/products | Admin | Crear producto |
-| PATCH | /api/products/:id/stock | Admin | Actualizar stock |
+| PATCH | /api/products/:id | Admin | Editar producto (cualquier campo) |
+| DELETE | /api/products/:id | Admin | Eliminar producto (historial de ventas intacto) |
+| PATCH | /api/products/:id/stock | Sí | Actualizar stock |
 | POST | /api/sales | Sí | Registrar venta (decrementa stock, transaction) |
 | GET | /api/sales | Sí | Lista ventas (filtro: date) |
 | GET | /api/invoices | Sí | Lista facturas (filtros: status, guestId) |
@@ -208,7 +210,7 @@ services:
 
 ## Bruno Collection
 
-Colección de 39 requests en `backend/bruno/` para testing de API:
+Colección de 41 requests en `backend/bruno/` para testing de API:
 - Importar en Bruno → seleccionar entorno `dev` (baseUrl: localhost:3001)
 - Login automático: register/login scripts guardan `{{token}}`
 - Organizado por módulo: health/, auth/, rooms/, guests/, reservations/, pos/, billing/, reports/ (incluye gastos: list/create/delete)

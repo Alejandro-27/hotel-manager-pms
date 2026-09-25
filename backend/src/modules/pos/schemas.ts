@@ -9,6 +9,15 @@ export const createProductSchema = z.object({
   image: z.string().default(''),
 })
 
+export const updateProductSchema = z.object({
+  name: z.string().min(2, 'Nombre requerido').optional(),
+  category: z.enum(['desayunos', 'snacks', 'bebidas']).optional(),
+  price: z.number().nonnegative().optional(),
+  currentStock: z.number().int().min(0).optional(),
+  minStock: z.number().int().min(0).optional(),
+  image: z.string().optional(),
+})
+
 export const updateStockSchema = z.object({
   currentStock: z.number().int().min(0),
 })
@@ -30,5 +39,6 @@ export const createSaleSchema = z.object({
 })
 
 export type CreateProductInput = z.infer<typeof createProductSchema>
+export type UpdateProductInput = z.infer<typeof updateProductSchema>
 export type UpdateStockInput = z.infer<typeof updateStockSchema>
 export type CreateSaleInput = z.infer<typeof createSaleSchema>

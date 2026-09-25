@@ -220,6 +220,60 @@ describe('reservas y productos', () => {
     expect(forbidden.statusCode).toBe(403)
   })
 
+  it('solo el admin puede editar y eliminar productos', async () => {
+    const adminToken = await loginAsAdmin()
+    const recepcionToken = await registerUser(`recepcionprod-${Date.now()}@test.com`, 'Recepcion Prod')
+
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/products',
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { name: 'Toast con aguacate', category: 'desayunos', price: 6, currentStock: 20, minStock: 5, image: '' },
+    })
+    expect(created.statusCode).toBe(201)
+    const productId = (created.json() as { id: string }).id
+
+    const forbiddenUpdate = await app.inject({
+      method: 'PATCH',
+      url: `/api/products/${productId}`,
+      headers: { authorization: `Bearer ${recepcionToken}` },
+      payload: { name: 'Toast actualizado', price: 7 },
+    })
+    expect(forbiddenUpdate.statusCode).toBe(403)
+
+    const updated = await app.inject({
+      method: 'PATCH',
+      url: `/api/products/${productId}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { name: 'Toast con aguacate premium', price: 7.5, minStock: 3 },
+    })
+    expect(updated.statusCode).toBe(200)
+    expect((updated.json() as { name: string; price: number; minStock: number }).name).toBe('Toast con aguacate premium')
+    expect((updated.json() as { price: number }).price).toBe(7.5)
+    expect((updated.json() as { minStock: number }).minStock).toBe(3)
+
+    const forbiddenDelete = await app.inject({
+      method: 'DELETE',
+      url: `/api/products/${productId}`,
+      headers: { authorization: `Bearer ${recepcionToken}` },
+    })
+    expect(forbiddenDelete.statusCode).toBe(403)
+
+    const deleted = await app.inject({
+      method: 'DELETE',
+      url: `/api/products/${productId}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    })
+    expect(deleted.statusCode).toBe(204)
+
+    const doubleDelete = await app.inject({
+      method: 'DELETE',
+      url: `/api/products/${productId}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    })
+    expect(doubleDelete.statusCode).toBe(404)
+  })
+
   it('cancelar una reserva dos veces falla con 409', async () => {
     const adminToken = await loginAsAdmin()
     const token = await registerUser(`res-${Date.now()}@test.com`)

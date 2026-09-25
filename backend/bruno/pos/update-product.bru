@@ -1,0 +1,22 @@
+meta {
+  name: Update Product
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/products/:id
+  headers {
+    Authorization: Bearer {{token}}
+    Content-Type: application/json
+  }
+  body: json
+  {
+    "name": "Hamburguesa Clásica",
+    "category": "snacks",
+    "price": 10.50,
+    "currentStock": 25,
+    "minStock": 8,
+    "image": ""
+  }
+}

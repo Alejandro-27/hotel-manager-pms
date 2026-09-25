@@ -4,7 +4,7 @@ import type { Product as ProductType } from '@hotel/types'
 import { db } from '../../db/index.js'
 import { products, rooms, sales } from '../../db/schema.js'
 import { AppError } from '../../plugins/error-handler.js'
-import type { CreateProductInput, CreateSaleInput, UpdateStockInput } from './schemas.js'
+import type { CreateProductInput, CreateSaleInput, UpdateProductInput, UpdateStockInput } from './schemas.js'
 
 export async function listProducts(category?: ProductType['category']) {
   if (category) {
@@ -29,6 +29,17 @@ export async function updateStock(id: string, input: UpdateStockInput) {
   await getProductById(id)
   await db.update(products).set({ currentStock: input.currentStock }).where(eq(products.id, id))
   return getProductById(id)
+}
+
+export async function updateProduct(id: string, input: UpdateProductInput) {
+  await getProductById(id)
+  await db.update(products).set(input).where(eq(products.id, id))
+  return getProductById(id)
+}
+
+export async function deleteProduct(id: string) {
+  await getProductById(id)
+  await db.delete(products).where(eq(products.id, id))
 }
 
 export async function createSale(input: CreateSaleInput) {

@@ -18,6 +18,16 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   Table,
   TableBody,
   TableCell,
@@ -47,6 +57,8 @@ import {
   Check,
   AlertCircle,
   RefreshCw,
+  Search,
+  Pencil,
 } from "lucide-react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth-context"
@@ -517,21 +529,26 @@ function InventoryTable({
     Object.fromEntries(products.map((p) => [p.id, p.currentStock]))
   )
   const [saving, setSaving] = useState<string | null>(null)
-
-  const [createOpen, setCreateOpen] = useState(false)
-  const [creating, setCreating] = useState(false)
-  const [createError, setCreateError] = useState<string | null>(null)
-  const [form, setForm] = useState({
-    name: "",
-    category: "desayunos" as ProductCategory,
-    price: "",
-    currentStock: "0",
-    minStock: "0",
-  })
+  const [query, setQuery] = useState("")
+  const [dialog, setDialog] = useState<{ mode: "create" } | { mode: "edit"; product: Product } | null>(null)
+  const [deleting, setDeleting] = useState<Product | null>(null)
+  const [deletingLoading, setDeletingLoading] = useState(false)
 
   useEffect(() => {
     setStockMap(Object.fromEntries(products.map((p) => [p.id, p.currentStock])))
   }, [products])
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return products
+    return products.filter((p) => {
+      const estado = (stockMap[p.id] ?? p.currentStock) < p.minStock ? "stock bajo" : "ok"
+      const haystack = [p.name, p.category, String(p.price), String(stockMap[p.id] ?? p.currentStock), String(p.minStock), estado]
+        .join(" ")
+        .toLowerCase()
+      return haystack.includes(q)
+    })
+  }, [products, query, stockMap])
 
   async function handleSave(id: string) {
     setSaving(id)
@@ -546,125 +563,271 @@ function InventoryTable({
     }
   }
 
-  async function handleCreateProduct() {
+  async function handleDelete() {
+    if (!deleting) return
+    setDeletingLoading(true)
+    onError(null)
+    try {
+      await api.products.remove(deleting.id)
+      setDeleting(null)
+      onChanged()
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Error al eliminar el producto")
+    } finally {
+      setDeletingLoading(false)
+    }
+  }
+
+  const colSpan = isAdmin ? 7 : 6
+
+  return (
+    <>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-3">
+          <CardTitle className="flex items-center gap-2 text-foreground">
+            <Package className="size-4" />
+            Inventario de Productos
+            <Badge variant="secondary" className="text-xs">{filtered.length}</Badge>
+          </CardTitle>
+          <div className="flex items-center gap-3">
+            <div className="relative w-full max-w-xs">
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar producto, categoria, stock..."
+                className="pl-9 h-9"
+              />
+            </div>
+            {isAdmin && (
+              <Button size="sm" onClick={() => setDialog({ mode: "create" })}>
+                <Plus className="mr-1 size-4" />
+                Nuevo Producto
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Producto</TableHead>
+                  <TableHead>Categoria</TableHead>
+                  <TableHead>Precio</TableHead>
+                  <TableHead>Stock Actual</TableHead>
+                  <TableHead>Stock Minimo</TableHead>
+                  <TableHead>Estado</TableHead>
+                  {isAdmin && <TableHead>Acciones</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={colSpan} className="h-24 text-center text-muted-foreground">
+                      {products.length === 0
+                        ? "No hay productos en el inventario. Crea el primero con el boton Nuevo Producto."
+                        : "No hay productos que coincidan con la busqueda."}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filtered.map((product) => {
+                    const isLow = (stockMap[product.id] ?? product.currentStock) < product.minStock
+                    return (
+                      <TableRow key={product.id}>
+                        <TableCell className="font-medium text-foreground">{product.name}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="capitalize text-xs">
+                            {product.category}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{formatCurrency(product.price)}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="number"
+                              min="0"
+                              value={stockMap[product.id] ?? product.currentStock}
+                              onChange={(e) =>
+                                setStockMap((prev) => ({ ...prev, [product.id]: Number(e.target.value) }))
+                              }
+                              className="w-20 h-8 text-sm"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-8"
+                              disabled={saving === product.id}
+                              onClick={() => handleSave(product.id)}
+                            >
+                              {saving === product.id ? (
+                                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
+                              ) : (
+                                <Check className="size-4" />
+                              )}
+                              <span className="sr-only">Guardar stock</span>
+                            </Button>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{product.minStock}</TableCell>
+                        <TableCell>
+                          {isLow ? (
+                            <Badge variant="destructive" className="text-xs">Stock bajo</Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-xs">OK</Badge>
+                          )}
+                        </TableCell>
+                        {isAdmin && (
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="size-8"
+                                onClick={() => setDialog({ mode: "edit", product })}
+                              >
+                                <Pencil className="size-4" />
+                                <span className="sr-only">Editar</span>
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="size-8 text-destructive hover:text-destructive"
+                                onClick={() => setDeleting(product)}
+                              >
+                                <Trash2 className="size-4" />
+                                <span className="sr-only">Eliminar</span>
+                              </Button>
+                            </div>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    )
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <ProductFormDialog
+        mode={dialog?.mode === "edit" ? "edit" : "create"}
+        product={dialog?.mode === "edit" ? dialog.product : null}
+        open={dialog !== null}
+        onOpenChange={(open) => { if (!open) setDialog(null) }}
+        onSaved={onChanged}
+      />
+
+      <AlertDialog open={deleting !== null} onOpenChange={(open) => { if (!open) setDeleting(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-foreground">Eliminar producto</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Seguro que quieres eliminar "{deleting?.name}" del inventario? Esta accion no se puede deshacer.
+              El historial de ventas no se vera afectado.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deletingLoading}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              {deletingLoading ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  )
+}
+
+// ---------- Product Form Dialog ----------
+
+function ProductFormDialog({
+  mode,
+  product,
+  open,
+  onOpenChange,
+  onSaved,
+}: {
+  mode: "create" | "edit"
+  product: Product | null
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onSaved: () => void
+}) {
+  const [form, setForm] = useState({
+    name: "",
+    category: "desayunos" as ProductCategory,
+    price: "",
+    currentStock: "0",
+    minStock: "0",
+  })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    setError(null)
+    if (mode === "edit" && product) {
+      setForm({
+        name: product.name,
+        category: product.category,
+        price: String(product.price),
+        currentStock: String(product.currentStock),
+        minStock: String(product.minStock),
+      })
+    } else {
+      setForm({ name: "", category: "desayunos", price: "", currentStock: "0", minStock: "0" })
+    }
+  }, [open, mode, product])
+
+  const isEdit = mode === "edit"
+
+  async function handleSubmit() {
     const price = Number(form.price)
     if (!form.name.trim() || Number.isNaN(price) || price < 0) {
-      setCreateError("Introduce un nombre y un precio valido")
+      setError("Introduce un nombre y un precio valido")
       return
     }
-    setCreating(true)
-    setCreateError(null)
+    setSaving(true)
+    setError(null)
     try {
-      await api.products.create({
+      const body = {
         name: form.name.trim(),
         category: form.category,
         price,
         currentStock: Number(form.currentStock) || 0,
         minStock: Number(form.minStock) || 0,
-      })
-      setCreateOpen(false)
-      setForm({ name: "", category: "desayunos", price: "", currentStock: "0", minStock: "0" })
-      onChanged()
+      }
+      if (isEdit && product) {
+        await api.products.update(product.id, body)
+      } else {
+        await api.products.create(body)
+      }
+      onSaved()
+      onOpenChange(false)
     } catch (err) {
-      setCreateError(err instanceof Error ? err.message : "Error al crear el producto")
+      setError(err instanceof Error ? err.message : "Error al guardar el producto")
     } finally {
-      setCreating(false)
+      setSaving(false)
     }
   }
 
   return (
-    <>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2 text-foreground">
-          <Package className="size-4" />
-          Inventario de Productos
-        </CardTitle>
-        {isAdmin && (
-          <Button size="sm" onClick={() => { setCreateError(null); setCreateOpen(true) }}>
-            <Plus className="mr-1 size-4" />
-            Nuevo Producto
-          </Button>
-        )}
-      </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Producto</TableHead>
-                <TableHead>Categoria</TableHead>
-                <TableHead>Precio</TableHead>
-                <TableHead>Stock Actual</TableHead>
-                <TableHead>Stock Minimo</TableHead>
-                <TableHead>Estado</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {products.map((product) => {
-                const isLow = (stockMap[product.id] ?? product.currentStock) < product.minStock
-                return (
-                  <TableRow key={product.id}>
-                    <TableCell className="font-medium text-foreground">{product.name}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="capitalize text-xs">
-                        {product.category}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{formatCurrency(product.price)}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          min="0"
-                          value={stockMap[product.id] ?? product.currentStock}
-                          onChange={(e) =>
-                            setStockMap((prev) => ({ ...prev, [product.id]: Number(e.target.value) }))
-                          }
-                          className="w-20 h-8 text-sm"
-                        />
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-8"
-                          disabled={saving === product.id}
-                          onClick={() => handleSave(product.id)}
-                        >
-                          {saving === product.id ? (
-                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                            </svg>
-                          ) : (
-                            <Check className="size-4" />
-                          )}
-                          <span className="sr-only">Guardar stock</span>
-                        </Button>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{product.minStock}</TableCell>
-                    <TableCell>
-                      {isLow ? (
-                        <Badge variant="destructive" className="text-xs">Stock bajo</Badge>
-                      ) : (
-                        <Badge variant="secondary" className="text-xs">OK</Badge>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
-
-    {/* New Product Dialog */}
-    <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-foreground">Nuevo Producto</DialogTitle>
-          <DialogDescription>Añade un producto al inventario de catering</DialogDescription>
+          <DialogTitle className="text-foreground">{isEdit ? "Editar Producto" : "Nuevo Producto"}</DialogTitle>
+          <DialogDescription>
+            {isEdit ? `Actualiza los datos de ${product?.name}` : "Añade un producto al inventario de catering"}
+          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-2">
           <div className="grid gap-2">
@@ -727,21 +890,20 @@ function InventoryTable({
               />
             </div>
           </div>
-          {createError && (
+          {error && (
             <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
               <AlertCircle className="mt-0.5 size-4 shrink-0" />
-              <span>{createError}</span>
+              <span>{error}</span>
             </div>
           )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
-          <Button onClick={handleCreateProduct} disabled={creating}>
-            {creating ? "Creando..." : "Crear producto"}
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button onClick={handleSubmit} disabled={saving}>
+            {saving ? (isEdit ? "Guardando..." : "Creando...") : isEdit ? "Guardar cambios" : "Crear producto"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
-    </>
   )
 }

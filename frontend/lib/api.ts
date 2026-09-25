@@ -188,6 +188,18 @@ export const api = {
     }) => request<Product>('/api/products', { method: 'POST', body: JSON.stringify(data) }),
     updateStock: (id: string, currentStock: number) =>
       request<Product>(`/api/products/${id}/stock`, { method: 'PATCH', body: JSON.stringify({ currentStock }) }),
+    update: (
+      id: string,
+      data: Partial<{
+        name: string
+        category: Product['category']
+        price: number
+        currentStock: number
+        minStock: number
+        image: string
+      }>,
+    ) => request<Product>(`/api/products/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    remove: (id: string) => request<null>(`/api/products/${id}`, { method: 'DELETE' }),
   },
 
   sales: {

@@ -1,8 +1,8 @@
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import type { Product } from '@hotel/types'
-import { listProducts, createProduct, updateStock, createSale, listSales } from './service.js'
-import { createProductSchema, updateStockSchema, createSaleSchema, productParamsSchema } from './schemas.js'
+import { listProducts, createProduct, updateProduct, deleteProduct, updateStock, createSale, listSales } from './service.js'
+import { createProductSchema, updateProductSchema, updateStockSchema, createSaleSchema, productParamsSchema } from './schemas.js'
 
 export default async function posRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>()
@@ -25,6 +25,21 @@ export default async function posRoutes(app: FastifyInstance) {
     schema: { params: productParamsSchema, body: updateStockSchema },
   }, async (req) => {
     return updateStock(req.params.id, req.body)
+  })
+
+  typedApp.patch('/api/products/:id', {
+    preHandler: [app.requireAdmin],
+    schema: { params: productParamsSchema, body: updateProductSchema },
+  }, async (req) => {
+    return updateProduct(req.params.id, req.body)
+  })
+
+  typedApp.delete('/api/products/:id', {
+    preHandler: [app.requireAdmin],
+    schema: { params: productParamsSchema },
+  }, async (req, reply) => {
+    await deleteProduct(req.params.id)
+    reply.code(204).send()
   })
 
   typedApp.post('/api/sales', {

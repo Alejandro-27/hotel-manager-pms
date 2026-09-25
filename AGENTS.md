@@ -13,7 +13,7 @@ Sistema de gestión hotelera (PMS) y punto de venta (POS) para catering. Monorep
 - **Tipos compartidos**: `@hotel/types` en `packages/types/`
 - **Package manager**: pnpm (NO npm)
 - **Testing**: Vitest + React Testing Library (frontend)
-- **API testing**: Bruno collection en `backend/bruno/` (39 requests)
+- **API testing**: Bruno collection en `backend/bruno/` (41 requests)
 
 ## Inicio rápido
 
@@ -36,7 +36,7 @@ pnpm dev:api                                  # Backend en http://localhost:3001
 | `pnpm build:api` | Build backend (tsc → `dist/`) |
 | `pnpm lint` | ESLint frontend |
 | `pnpm test` | Vitest frontend (33 tests) |
-| `pnpm test:api` | Vitest backend (12 tests, requiere PostgreSQL) |
+| `pnpm test:api` | Vitest backend (14 tests, requiere PostgreSQL) |
 | `docker compose up -d` | Levantar PostgreSQL |
 | `pnpm --filter @hotel/backend db:migrate` | Aplicar migraciones |
 | `pnpm --filter @hotel/backend db:generate` | Generar migración desde schema |
@@ -78,7 +78,7 @@ backend/                    ← @hotel/backend — Fastify API (PostgreSQL)
 ├── src/
 │   ├── app.ts              ← Instancia Fastify (exportada para Vercel)
 │   ├── index.ts            ← Entry point (migrate + listen)
-│   ├── api.test.ts         ← Tests de API (fastify.inject, 12 tests)
+│   ├── api.test.ts         ← Tests de API (fastify.inject, 14 tests)
 │   ├── config/env.ts       ← Variables de entorno
 │   ├── db/
 │   │   ├── index.ts        ← Conexión PostgreSQL (postgres-js)
@@ -99,7 +99,7 @@ backend/                    ← @hotel/backend — Fastify API (PostgreSQL)
 │       └── reports/        ← Dashboard, financiero, ocupación
 ├── test/global-setup.ts    ← Crea BD de test + migra + siembra admin
 ├── vitest.config.ts        ← Config de tests (BD hotel_manager_test)
-├── bruno/                  ← Colección Bruno (39 requests)
+├── bruno/                  ← Colección Bruno (41 requests)
 ├── drizzle/                ← Migraciones generadas
 ├── docker-compose.yml      ← PostgreSQL 16
 ├── .env                    ← Variables de entorno (NO commitear)
@@ -180,7 +180,7 @@ backend/                    ← @hotel/backend — Fastify API (PostgreSQL)
 ## Reglas para testing
 
 - **Frontend**: Vitest + React Testing Library, tests unitarios en `*.test.ts`
-- **Backend**: Vitest (fastify.inject) contra una BD PostgreSQL dedicada (`hotel_manager_test`); testing manual con Bruno (39 requests)
+- **Backend**: Vitest (fastify.inject) contra una BD PostgreSQL dedicada (`hotel_manager_test`); testing manual con Bruno (41 requests)
 - Cobertura mínima: helpers de utilidad, lógica de negocio, componentes críticos
 
 ## Reglas para dependencias

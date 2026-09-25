@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { cn, formatCurrency, exportToCsv } from './utils'
+import { cn, formatCurrency, exportToCsv, periodRangeLabel } from './utils'
 
 describe('cn', () => {
   it('merges class names', () => {
@@ -79,5 +79,35 @@ describe('exportToCsv', () => {
     URL.createObjectURL = createObjectURL
     exportToCsv('informe.csv', [])
     expect(createObjectURL).not.toHaveBeenCalled()
+  })
+
+  it('prepends metadata lines before the header row', () => {
+    const createObjectURL = vi.fn<(obj: Blob) => string>(() => 'blob:csv')
+    URL.createObjectURL = createObjectURL
+
+    exportToCsv(
+      'informe.csv',
+      [{ Mes: 'Ene', Ingresos: 100 }],
+      ['Hotel Test', 'Informe financiero', 'Periodo: 01 mar 2026 - 25 sep 2026'],
+    )
+
+    const [blob] = createObjectURL.mock.calls[0]
+    return expect(blob.text()).resolves.toContain(
+      'Hotel Test\nInforme financiero\nPeriodo: 01 mar 2026 - 25 sep 2026\n\nMes,Ingresos'
+    )
+  })
+})
+
+describe('periodRangeLabel', () => {
+  it('builds the range from the first day of the first month to today', () => {
+    const result = periodRangeLabel(6, new Date(2026, 8, 25))
+    expect(result).toBe('01 abr 2026 - 25 sept 2026')
+    expect(result).toContain(' - ')
+  })
+
+  it('uses the current month for a 1 month period', () => {
+    const result = periodRangeLabel(1, new Date(2026, 8, 25))
+    const start = result.split(' - ')[0]
+    expect(start).toContain('2026')
   })
 })

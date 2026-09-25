@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback, useEffect, useMemo } from "react"
+import { createPortal } from "react-dom"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -41,6 +42,7 @@ import {
   RefreshCw,
   ShieldAlert,
   Plus,
+  Printer,
   Trash2,
 } from "lucide-react"
 import {
@@ -53,8 +55,8 @@ import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Pie, PieChart, Cell } from 
 import { api, type FinancialReport, type OccupancyReport } from "@/lib/api"
 import { useAuth } from "@/lib/auth-context"
 import type { Invoice, Reservation, Room, Guest, Product, Sale, Expense } from "@/lib/types"
-import { exportToCsv } from "@/lib/utils"
-import { formatCurrency } from "@/lib/utils"
+import { exportToCsv, formatCurrency, periodRangeLabel } from "@/lib/utils"
+import { ReportsPrintDoc } from "@/components/reports-print-doc"
 
 const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 const typeLabels: Record<string, string> = {
@@ -141,6 +143,11 @@ export function ReportsView() {
     date: new Date().toISOString().slice(0, 10),
     note: "",
   })
+  const [printRoot, setPrintRoot] = useState<HTMLElement | null>(null)
+
+  useEffect(() => {
+    setPrintRoot(document.body)
+  }, [])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -193,6 +200,10 @@ export function ReportsView() {
   const netProfit = totalRevenue - totalExpenses
   const avgOccupancy = occupancy?.rate ?? 0
   const revPerRoom = useMemo(() => (rooms.length ? Math.round(totalRevenue / rooms.length) : 0), [totalRevenue, rooms.length])
+
+  const hotelName = user?.hotelName?.trim() || "Hotel"
+  const periodLabel = periodRangeLabel(periodMonths[period] ?? 6)
+  const generatedAt = new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short", year: "numeric" }).format(new Date())
 
   const roomById = useMemo(() => new Map(rooms.map((r) => [r.id, r])), [rooms])
   const reservationById = useMemo(() => new Map(reservations.map((r) => [r.id, r])), [reservations])
@@ -339,7 +350,19 @@ export function ReportsView() {
         Gastos: m.gastos,
         Beneficio: m.ingresos - m.gastos,
       })),
+      [hotelName, "Informe financiero", `Periodo: ${periodLabel}`, `Generado: ${generatedAt}`],
     )
+  }
+
+  function handleExportPdf() {
+    const prevTitle = document.title
+    document.title = `informe-financiero-${new Date().toISOString().slice(0, 10)}`
+    window.print()
+    const restore = () => {
+      document.title = prevTitle
+      window.removeEventListener("afterprint", restore)
+    }
+    window.addEventListener("afterprint", restore)
   }
 
   if (loading) {
@@ -389,6 +412,10 @@ export function ReportsView() {
             <Button variant="outline" size="sm" onClick={handleExport}>
               <Download className="mr-1 size-3" />
               Exportar
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExportPdf}>
+              <Printer className="mr-1 size-3" />
+              PDF
             </Button>
           </div>
         )}
@@ -1042,6 +1069,28 @@ export function ReportsView() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {printRoot
+        ? createPortal(
+            <div className="print-only">
+              <ReportsPrintDoc
+                hotelName={hotelName}
+                periodLabel={periodLabel}
+                generatedAt={generatedAt}
+                userName={user?.name}
+                totalRevenue={totalRevenue}
+                totalExpenses={totalExpenses}
+                netProfit={netProfit}
+                avgOccupancy={avgOccupancy}
+                occupiedRooms={occupancy?.occupiedRooms ?? 0}
+                totalRooms={occupancy?.totalRooms ?? rooms.length}
+                revPerRoom={revPerRoom}
+                monthly={monthlyRevenue}
+              />
+            </div>,
+            printRoot,
+          )
+        : null}
     </div>
   )
 }

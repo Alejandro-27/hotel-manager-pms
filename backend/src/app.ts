@@ -48,7 +48,7 @@ export function buildApp() {
     origin: (origin, cb) => {
       const normalizedOrigin = normalizeOrigin(origin)
 
-      if (!origin || allowedOrigins.has(normalizedOrigin)) {
+      if (!origin || allowedOrigins.has(normalizedOrigin ?? '')) {
         cb(null, true)
         return
       }

@@ -273,3 +273,21 @@ describe('reservas y productos', () => {
     expect(cancel2.statusCode).toBe(409)
   })
 })
+
+describe('cors', () => {
+  it('acepta un origin con barra final', async () => {
+    const res = await app.inject({
+      method: 'OPTIONS',
+      url: '/api/guests/123',
+      headers: {
+        origin: 'http://localhost:3000/',
+        'access-control-request-method': 'PATCH',
+        'access-control-request-headers': 'authorization, content-type',
+      },
+    })
+
+    expect(res.statusCode).toBe(204)
+    expect(res.headers['access-control-allow-origin']).toBe('http://localhost:3000/')
+    expect(res.headers['access-control-allow-methods']).toContain('PATCH')
+  })
+})

@@ -16,6 +16,8 @@ import expenseRoutes from './modules/expenses/routes.js'
 import reportRoutes from './modules/reports/routes.js'
 import { env } from './config/env.js'
 
+const normalizeOrigin = (value?: string) => value?.replace(/\/+$/, '') ?? value
+
 export function buildApp() {
   const app = Fastify({
     logger: {
@@ -38,21 +40,28 @@ export function buildApp() {
   app.setValidatorCompiler(validatorCompiler)
   app.setSerializerCompiler(serializerCompiler)
 
+  const allowedOrigins = new Set(
+    env.corsOrigin.map((origin) => normalizeOrigin(origin) ?? '')
+  )
+
   app.register(cors, {
     origin: (origin, cb) => {
-      if (!origin || env.corsOrigin.includes(origin)) {
+      const normalizedOrigin = normalizeOrigin(origin)
+
+      if (!origin || allowedOrigins.has(normalizedOrigin)) {
         cb(null, true)
         return
       }
+
       cb(new Error('Not allowed by CORS'), false)
     },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   })
 
   app.register(fastifyCookie)
-
   app.register(fastifyHelmet)
-
   app.register(errorHandlerPlugin)
   app.register(authPlugin)
 

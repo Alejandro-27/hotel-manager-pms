@@ -1,13 +1,10 @@
 import { randomUUID } from 'node:crypto'
-import { and, desc, eq, gte, gt, inArray, lt } from 'drizzle-orm'
-import type { PgTransaction } from 'drizzle-orm/pg-core'
-import type { PostgresJsQueryResultHKT } from 'drizzle-orm/postgres-js'
-import type { ExtractTablesWithRelations } from 'drizzle-orm'
+import { and, desc, eq, gt, inArray, lt } from 'drizzle-orm'
 import type { ReservationStatus } from '@hotel/types'
 import { db } from '../../db/index.js'
-import * as schema from '../../db/schema.js'
-import { guests, invoices, reservations, rooms, sales } from '../../db/schema.js'
+import { guests, invoices, reservations, rooms } from '../../db/schema.js'
 import { AppError } from '../../plugins/error-handler.js'
+import { syncInvoiceForReservation } from '../billing/service.js'
 import type { CreateReservationInput } from './schemas.js'
 
 export interface ReservationFilters {
@@ -124,7 +121,7 @@ export async function checkOutReservation(id: string) {
       .set({ status: 'libre', updatedAt: now })
       .where(eq(rooms.id, reservation.roomId))
 
-    await generateInvoice(tx, reservation)
+    await syncInvoiceForReservation(tx, reservation)
     return (await tx.select().from(reservations).where(eq(reservations.id, id)).limit(1))[0]
   })
 }
@@ -148,46 +145,11 @@ export async function cancelReservation(id: string) {
         .where(eq(rooms.id, reservation.roomId))
     }
 
+    const invoice = (await tx.select().from(invoices).where(eq(invoices.reservationId, reservation.id)).limit(1))[0]
+    if (invoice && invoice.status === 'pendiente') {
+      await tx.delete(invoices).where(eq(invoices.id, invoice.id))
+    }
+
     return (await tx.select().from(reservations).where(eq(reservations.id, id)).limit(1))[0]
-  })
-}
-
-type DbLike = PgTransaction<PostgresJsQueryResultHKT, typeof schema, ExtractTablesWithRelations<typeof schema>>
-
-async function generateInvoice(tx: DbLike, reservation: NonNullable<Awaited<ReturnType<typeof getReservationById>>>) {
-  const room = (await tx.select().from(rooms).where(eq(rooms.id, reservation.roomId)).limit(1))[0]
-  if (!room) return
-
-  const nights = daysBetween(reservation.checkIn, reservation.checkOut)
-  const roomTotal = nights * room.pricePerNight
-
-  const roomSales = await tx.select().from(sales).where(and(
-    eq(sales.roomId, reservation.roomId),
-    gte(sales.date, reservation.checkIn),
-  ))
-
-  const cateringCharges = roomSales.flatMap(s => s.items)
-  const cateringTotal = cateringCharges.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0)
-
-  const subtotal = Math.round((roomTotal + cateringTotal) * 100) / 100
-  const advancePayment = reservation.advancePayment
-  const totalDue = Math.round((subtotal - advancePayment) * 100) / 100
-
-  const existingInvoice = (await tx.select().from(invoices).where(eq(invoices.reservationId, reservation.id)).limit(1))[0]
-  if (existingInvoice) return
-
-  await tx.insert(invoices).values({
-    id: randomUUID(),
-    reservationId: reservation.id,
-    guestId: reservation.guestId,
-    roomNights: { nights, pricePerNight: room.pricePerNight },
-    cateringCharges,
-    tax: 10,
-    subtotal,
-    advancePayment,
-    totalDue,
-    status: totalDue <= 0 ? 'pagada' : 'pendiente',
-    date: new Date().toISOString().slice(0, 10),
-    createdAt: new Date().toISOString(),
   })
 }

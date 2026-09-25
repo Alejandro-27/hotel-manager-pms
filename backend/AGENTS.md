@@ -28,7 +28,7 @@ pnpm test             # Vitest (fastify.inject contra BD hotel_manager_test)
 src/
 ├── app.ts              ← buildApp(): Fastify + CORS + plugins + rutas (exportado para Vercel)
 ├── index.ts            ← migrate on boot + listen (PORT 3001)
-├── api.test.ts         ← Tests de API (fastify.inject, 17 tests)
+├── api.test.ts         ← Tests de API (fastify.inject, 20 tests)
 ├── config/env.ts       ← DATABASE_URL, JWT_SECRET, PORT, CORS_ORIGIN
 ├── db/
 │   ├── index.ts        ← postgres client (pool max: 10) + drizzle instance
@@ -43,8 +43,8 @@ src/
     ├── rooms/          ← CRUD + PATCH status (admin only)
     ├── guests/         ← Búsqueda + CRUD
     ├── reservations/   ← CRUD + checkin/checkout/cancel (transactions)
-    ├── pos/            ← CRUD products + POST sales (transactions) + stock
-    ├── billing/        ← GET invoices + GET invoice/:id + POST pay
+    ├── pos/            ← CRUD products + POST sales (transactions) + stock (cargo a habitación crea/actualiza factura en curso)
+    ├── billing/        ← GET invoices + GET invoice/:id + POST pay + syncInvoiceForReservation (upsert factura en estancia/check-out)
     ├── expenses/       ← CRUD gastos (list all roles, create/delete admin)
     └── reports/        ← GET dashboard, financial (?months=), occupancy
 test/
@@ -156,14 +156,14 @@ await db.delete(rooms).where(eq(rooms.id, id))
 | POST | /api/reservations | Sí | Crear reserva (verifica disponibilidad) |
 | GET | /api/reservations/:id | Sí | Detalle reserva |
 | PATCH | /api/reservations/:id/checkin | Sí | Check-in → room ocupada |
-| PATCH | /api/reservations/:id/checkout | Sí | Check-out → room libre + factura auto |
-| PATCH | /api/reservations/:id/cancel | Sí | Cancelar reserva |
+| PATCH | /api/reservations/:id/checkout | Sí | Check-out → room libre + factura (crea o finaliza la factura en curso) |
+| PATCH | /api/reservations/:id/cancel | Sí | Cancelar reserva (borra la factura en curso si está pendiente) |
 | GET | /api/products | Sí | Lista productos (filtro: category, campo active) |
 | POST | /api/products | Admin | Crear producto (activo por defecto) |
 | PATCH | /api/products/:id | Admin | Editar producto (cualquier campo, incluido active) |
 | DELETE | /api/products/:id | Admin | Eliminar producto. 409 si tiene historial de ventas (desactivar en su lugar) |
 | PATCH | /api/products/:id/stock | Sí | Actualizar stock |
-| POST | /api/sales | Sí | Registrar venta (decrementa stock, transaction) |
+| POST | /api/sales | Sí | Registrar venta (decrementa stock, transaction; cargo a habitación refleja el cargo en la factura al instante) |
 | GET | /api/sales | Sí | Lista ventas (filtro: date) |
 | GET | /api/invoices | Sí | Lista facturas (filtros: status, guestId) |
 | GET | /api/invoices/:id | Sí | Detalle factura |

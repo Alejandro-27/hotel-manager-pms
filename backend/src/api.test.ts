@@ -418,6 +418,218 @@ describe('ciclo de vida de productos', () => {
   })
 })
 
+describe('factura en curso por cargo a habitacion', () => {
+  const isoDate = (offset: number): string => {
+    const d = new Date()
+    d.setDate(d.getDate() + offset)
+    return d.toISOString().slice(0, 10)
+  }
+
+  async function createStay() {
+    const adminToken = await loginAsAdmin()
+    const token = await registerUser(`estancia-${Date.now()}-${Math.random().toString(36).slice(2)}@test.com`)
+
+    const guest = await app.inject({
+      method: 'POST',
+      url: '/api/guests',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { name: 'Huesped Estancia', document: `DOC-E-${Date.now()}`, country: 'ES', email: 'e@t.com', phone: '600000001' },
+    })
+    expect(guest.statusCode).toBe(201)
+    const guestId = (guest.json() as { id: string }).id
+
+    const room = await app.inject({
+      method: 'POST',
+      url: '/api/rooms',
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { number: `E-${Date.now()}`, floor: 1, type: 'doble', maxCapacity: 2, pricePerNight: 80 },
+    })
+    expect(room.statusCode).toBe(201)
+    const roomId = (room.json() as { id: string }).id
+
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/reservations',
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        guestId,
+        roomId,
+        checkIn: isoDate(-3),
+        checkOut: isoDate(1),
+        guests: 1,
+        paymentMethod: 'efectivo',
+        advancePayment: 0,
+        notes: '',
+      },
+    })
+    expect(created.statusCode).toBe(201)
+    const reservationId = (created.json() as { id: string }).id
+
+    const checkin = await app.inject({
+      method: 'PATCH',
+      url: `/api/reservations/${reservationId}/checkin`,
+      headers: { authorization: `Bearer ${token}` },
+    })
+    expect(checkin.statusCode).toBe(200)
+
+    const product = await app.inject({
+      method: 'POST',
+      url: '/api/products',
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { name: `Cafe Estancia ${Date.now()}`, category: 'bebidas', price: 5, currentStock: 10, minStock: 2, image: '' },
+    })
+    expect(product.statusCode).toBe(201)
+    const productId = (product.json() as { id: string }).id
+
+    return { adminToken, token, guestId, roomId, reservationId, productId }
+  }
+
+  it('crea la factura en curso al instante y acumula cada cargo', async () => {
+    const stay = await createStay()
+
+    const sale1 = await app.inject({
+      method: 'POST',
+      url: '/api/sales',
+      headers: { authorization: `Bearer ${stay.token}` },
+      payload: {
+        items: [{ productId: stay.productId, quantity: 2, unitPrice: 5 }],
+        paymentMethod: 'cargo_habitacion',
+        roomId: stay.roomId,
+      },
+    })
+    expect(sale1.statusCode).toBe(201)
+
+    const list1 = await app.inject({
+      method: 'GET',
+      url: `/api/invoices?guestId=${stay.guestId}`,
+      headers: { authorization: `Bearer ${stay.token}` },
+    })
+    expect(list1.statusCode).toBe(200)
+    const invoices1 = list1.json() as {
+      id: string
+      reservationId: string
+      roomNights: { nights: number; pricePerNight: number }
+      cateringCharges: { productId: string; quantity: number; unitPrice: number }[]
+      subtotal: number
+      totalDue: number
+      status: string
+    }[]
+    expect(invoices1).toHaveLength(1)
+    const invoice = invoices1[0]
+    expect(invoice.reservationId).toBe(stay.reservationId)
+    expect(invoice.roomNights).toEqual({ nights: 4, pricePerNight: 80 })
+    expect(invoice.cateringCharges).toHaveLength(1)
+    expect(invoice.cateringCharges[0].quantity).toBe(2)
+    expect(invoice.subtotal).toBe(330)
+    expect(invoice.totalDue).toBe(330)
+    expect(invoice.status).toBe('pendiente')
+
+    const sale2 = await app.inject({
+      method: 'POST',
+      url: '/api/sales',
+      headers: { authorization: `Bearer ${stay.token}` },
+      payload: {
+        items: [{ productId: stay.productId, quantity: 1, unitPrice: 5 }],
+        paymentMethod: 'cargo_habitacion',
+        roomId: stay.roomId,
+      },
+    })
+    expect(sale2.statusCode).toBe(201)
+
+    const list2 = await app.inject({
+      method: 'GET',
+      url: `/api/invoices?guestId=${stay.guestId}`,
+      headers: { authorization: `Bearer ${stay.token}` },
+    })
+    const invoices2 = list2.json() as {
+      cateringCharges: { quantity: number }[]
+      subtotal: number
+      totalDue: number
+    }[]
+    expect(invoices2).toHaveLength(1)
+    expect(invoices2[0].cateringCharges).toHaveLength(2)
+    expect(invoices2[0].subtotal).toBe(335)
+    expect(invoices2[0].totalDue).toBe(335)
+  })
+
+  it('el check-out finaliza la factura en curso sin duplicarla', async () => {
+    const stay = await createStay()
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/sales',
+      headers: { authorization: `Bearer ${stay.token}` },
+      payload: {
+        items: [{ productId: stay.productId, quantity: 2, unitPrice: 5 }],
+        paymentMethod: 'cargo_habitacion',
+        roomId: stay.roomId,
+      },
+    })
+
+    const checkout = await app.inject({
+      method: 'PATCH',
+      url: `/api/reservations/${stay.reservationId}/checkout`,
+      headers: { authorization: `Bearer ${stay.token}` },
+    })
+    expect(checkout.statusCode).toBe(200)
+
+    const list = await app.inject({
+      method: 'GET',
+      url: `/api/invoices?guestId=${stay.guestId}`,
+      headers: { authorization: `Bearer ${stay.token}` },
+    })
+    const invoices = list.json() as {
+      roomNights: { nights: number }
+      cateringCharges: { quantity: number }[]
+      subtotal: number
+      totalDue: number
+      status: string
+    }[]
+    expect(invoices).toHaveLength(1)
+    expect(invoices[0].roomNights.nights).toBe(4)
+    expect(invoices[0].cateringCharges).toHaveLength(1)
+    expect(invoices[0].subtotal).toBe(330)
+    expect(invoices[0].totalDue).toBe(330)
+    expect(invoices[0].status).toBe('pendiente')
+  })
+
+  it('cancelar una reserva con factura pendiente elimina la factura', async () => {
+    const stay = await createStay()
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/sales',
+      headers: { authorization: `Bearer ${stay.token}` },
+      payload: {
+        items: [{ productId: stay.productId, quantity: 2, unitPrice: 5 }],
+        paymentMethod: 'cargo_habitacion',
+        roomId: stay.roomId,
+      },
+    })
+
+    const before = await app.inject({
+      method: 'GET',
+      url: `/api/invoices?guestId=${stay.guestId}`,
+      headers: { authorization: `Bearer ${stay.token}` },
+    })
+    expect((before.json() as unknown[])).toHaveLength(1)
+
+    const cancel = await app.inject({
+      method: 'PATCH',
+      url: `/api/reservations/${stay.reservationId}/cancel`,
+      headers: { authorization: `Bearer ${stay.token}` },
+    })
+    expect(cancel.statusCode).toBe(200)
+
+    const after = await app.inject({
+      method: 'GET',
+      url: `/api/invoices?guestId=${stay.guestId}`,
+      headers: { authorization: `Bearer ${stay.token}` },
+    })
+    expect((after.json() as unknown[])).toHaveLength(0)
+  })
+})
+
 describe('cors', () => {
   it('acepta un origin con barra final', async () => {
     const res = await app.inject({

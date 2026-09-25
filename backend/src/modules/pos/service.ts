@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto'
-import { asc, desc, eq, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, sql } from 'drizzle-orm'
 import type { Product as ProductType } from '@hotel/types'
 import { db } from '../../db/index.js'
-import { products, rooms, sales, invoices } from '../../db/schema.js'
+import { products, reservations, rooms, sales, invoices } from '../../db/schema.js'
 import { AppError } from '../../plugins/error-handler.js'
+import { syncInvoiceForReservation } from '../billing/service.js'
 import type { CreateProductInput, CreateSaleInput, UpdateProductInput, UpdateStockInput } from './schemas.js'
 
 export async function listProducts(category?: ProductType['category']) {
@@ -101,6 +102,17 @@ export async function createSale(input: CreateSaleInput) {
     }
 
     await tx.insert(sales).values(sale)
+
+    if (sale.paymentMethod === 'cargo_habitacion' && sale.roomId) {
+      const reservation = (await tx.select().from(reservations).where(and(
+        eq(reservations.roomId, sale.roomId),
+        eq(reservations.status, 'checkin'),
+      )).limit(1))[0]
+      if (reservation) {
+        await syncInvoiceForReservation(tx, reservation)
+      }
+    }
+
     return sale
   })
 }

@@ -410,7 +410,7 @@ export function ReportsView() {
             </Select>
             <Button variant="outline" size="sm" onClick={handleExport}>
               <FileSpreadsheet className="mr-1 size-3" />
-              Exportar
+              Excel
             </Button>
             <Button variant="outline" size="sm" onClick={handleExportPdf}>
               <Printer className="mr-1 size-3" />

@@ -32,9 +32,9 @@ import {
   Euro,
   DollarSign,
   Calendar,
-  Download,
   ArrowUpRight,
   UtensilsCrossed,
+  FileSpreadsheet,
   Star,
   Target,
   Receipt,
@@ -55,7 +55,8 @@ import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Pie, PieChart, Cell } from 
 import { api, type FinancialReport, type OccupancyReport } from "@/lib/api"
 import { useAuth } from "@/lib/auth-context"
 import type { Invoice, Reservation, Room, Guest, Product, Sale, Expense } from "@/lib/types"
-import { exportToCsv, formatCurrency, periodRangeLabel } from "@/lib/utils"
+import { formatCurrency, periodRangeLabel } from "@/lib/utils"
+import { exportReportXlsx } from "@/lib/export-report"
 import { ReportsPrintDoc } from "@/components/reports-print-doc"
 
 const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
@@ -340,18 +341,16 @@ export function ReportsView() {
     }
   }
 
-  function handleExport() {
+  async function handleExport() {
     if (monthlyRevenue.length === 0) return
-    exportToCsv(
-      `informe-financiero-${new Date().toISOString().slice(0, 10)}.csv`,
-      monthlyRevenue.map((m) => ({
-        Mes: m.month,
-        Ingresos: m.ingresos,
-        Gastos: m.gastos,
-        Beneficio: m.ingresos - m.gastos,
-      })),
-      [hotelName, "Informe financiero", `Periodo: ${periodLabel}`, `Generado: ${generatedAt}`],
-    )
+    try {
+      await exportReportXlsx(
+        { hotelName, periodLabel, generatedAt },
+        monthlyRevenue,
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al exportar el informe")
+    }
   }
 
   function handleExportPdf() {
@@ -410,7 +409,7 @@ export function ReportsView() {
               </SelectContent>
             </Select>
             <Button variant="outline" size="sm" onClick={handleExport}>
-              <Download className="mr-1 size-3" />
+              <FileSpreadsheet className="mr-1 size-3" />
               Exportar
             </Button>
             <Button variant="outline" size="sm" onClick={handleExportPdf}>

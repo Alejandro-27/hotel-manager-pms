@@ -48,12 +48,13 @@ frontend/         → Next.js (consume la API real)
     api.ts        → Cliente de la API real (fetch + endpoints)
     types.ts      → Re-export de @hotel/types
     validations.ts→ Schemas zod
-    utils.ts      → Utilidades (cn, formatCurrency, exportToCsv)
+    utils.ts        → Utilidades (cn, formatCurrency, periodRangeLabel)
+    export-report.ts→ Export XLSX de informes (write-excel-file)
 backend/          → Fastify API (auth JWT + PostgreSQL/Drizzle)
   src/modules/    → auth, rooms, guests, reservations, pos, billing, expenses, reports
   src/db/         → Schema Drizzle, migraciones y seed
   test/           → Tests e2e de API (Vitest) contra BD dedicada
-  bruno/          → Colección Bruno (39 requests) para probar la API
+  bruno/          → Colección Bruno (41 requests) para probar la API
 docker-compose.yml → PostgreSQL 16 local
 packages/
   types/          → @hotel/types — tipos de dominio compartidos
@@ -72,7 +73,7 @@ Servidor en `http://localhost:3001`. Login: `admin@hotel.com` / `Admin123!` (adm
 - **Facturación** — Facturas y pagos
 - **Habitaciones** — Gestión de habitaciones
 - **Configuración** — Perfil, contraseña y tema
-- **Informes** — KPIs, informe financiero por periodo, gastos y export CSV
+- **Informes** — KPIs, informe financiero por periodo, gastos y export a XLSX/PDF
 
 ## Estado actual
 

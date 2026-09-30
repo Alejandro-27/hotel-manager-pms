@@ -1,5 +1,7 @@
 # AGENTS.md — HotelManager PMS & POS
 
+> **Leer `memory.md` al inicio de cada sesión** (estado dinámico: pendientes, decisiones, log). Si algo cambia durante la sesión, actualizar `memory.md` al final.
+
 ## Propósito
 
 Sistema de gestión hotelera (PMS) y punto de venta (POS) para catering. Monorepo con frontend Next.js (API real) y backend Fastify con PostgreSQL real.
@@ -35,7 +37,7 @@ pnpm dev:api                                  # Backend en http://localhost:3001
 | `pnpm build` | Build frontend |
 | `pnpm build:api` | Build backend (tsc → `dist/`) |
 | `pnpm lint` | ESLint frontend |
-| `pnpm test` | Vitest frontend (35 tests) |
+| `pnpm test` | Vitest frontend (39 tests) |
 | `pnpm test:api` | Vitest backend (20 tests, requiere PostgreSQL) |
 | `docker compose up -d` | Levantar PostgreSQL |
 | `pnpm --filter @hotel/backend db:migrate` | Aplicar migraciones |
@@ -57,6 +59,7 @@ frontend/                   ← @hotel/frontend — Next.js (consume la API real
 ├── components/
 │   ├── app-sidebar.tsx     ← Navegación lateral
 │   ├── auth-screen.tsx     ← Login/registro (validado con zod)
+│   ├── reports-print-doc.tsx ← Documento print-only del informe (PDF)
 │   ├── ui/                 ← ~50 shadcn/ui components
 │   └── views/              ← 8 vistas principales del sistema
 │       ├── dashboard-view.tsx
@@ -73,7 +76,8 @@ frontend/                   ← @hotel/frontend — Next.js (consume la API real
     ├── types.ts            ← Re-export de @hotel/types (backward compat)
     ├── validations.ts      ← Schemas zod
     ├── constants.tsx       ← Configuraciones compartidas
-    └── utils.ts            ← cn(), formatCurrency(), exportToCsv()
+    ├── export-report.ts    ← Export XLSX de informes (write-excel-file)
+    └── utils.ts            ← cn(), formatCurrency(), periodRangeLabel()
 backend/                    ← @hotel/backend — Fastify API (PostgreSQL)
 ├── src/
 │   ├── app.ts              ← Instancia Fastify (exportada para Vercel)

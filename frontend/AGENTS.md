@@ -14,7 +14,7 @@
 pnpm dev          # Next.js dev server (localhost:3000)
 pnpm build        # Build producción
 pnpm lint         # ESLint
-pnpm test         # Vitest + React Testing Library (35 tests)
+pnpm test         # Vitest + React Testing Library (39 tests)
 ```
 
 ## Estructura
@@ -28,6 +28,7 @@ pnpm test         # Vitest + React Testing Library (35 tests)
 ├── components/
 │   ├── app-sidebar.tsx     ← Sidebar de navegación (shadcn Sidebar)
 │   ├── auth-screen.tsx     ← Login/registro (validado con zod, JWT real)
+│   ├── reports-print-doc.tsx ← Documento print-only del informe (PDF)
 │   ├── ui/                 ← ~50 componentes shadcn/ui
 │   └── views/              ← 8 vistas principales (una por módulo)
 │       ├── dashboard-view.tsx
@@ -44,7 +45,8 @@ pnpm test         # Vitest + React Testing Library (35 tests)
     ├── types.ts            ← Re-export de @hotel/types (backward compat)
     ├── validations.ts      ← Schemas zod para formularios
     ├── constants.tsx       ← Configuraciones compartidas
-    └── utils.ts            ← cn(), formatCurrency(), exportToCsv()
+    ├── export-report.ts    ← Export XLSX de informes (write-excel-file)
+    └── utils.ts            ← cn(), formatCurrency(), periodRangeLabel()
 ```
 
 ## Convenciones
@@ -76,7 +78,7 @@ pnpm test         # Vitest + React Testing Library (35 tests)
 ### Testing
 - Vitest + React Testing Library
 - Tests en `*.test.ts` junto al archivo fuente
-- 35 tests pasando (utils, api, auth-context, validaciones)
+- 39 tests pasando (utils, api, auth-context, validaciones, export-report)
 
 ## Vistas del sistema
 
@@ -89,7 +91,7 @@ pnpm test         # Vitest + React Testing Library (35 tests)
 | Facturación | `billing-view.tsx` | Facturas y pagos |
 | Habitaciones | `rooms-view.tsx` | Grid de habitaciones + gestión |
 | Configuración | `settings-view.tsx` | Perfil, contraseña y tema (solo lo real) |
-| Informes | `reports-view.tsx` | KPIs, financiero por periodo, gastos, export CSV |
+| Informes | `reports-view.tsx` | KPIs, financiero por periodo, gastos, export XLSX y PDF |
 
 ## Cosas que NO deben modificarse sin razón clara
 
@@ -102,7 +104,7 @@ pnpm test         # Vitest + React Testing Library (35 tests)
 1. **Nueva vista** → Crear `components/views/nombre-view.tsx` + agregar caso en `page.tsx`
 2. **Nuevo componente UI** → Usar `pnpm dlx shadcn@latest add [component]` o crear manualmente en `ui/`
 3. **Nuevo tipo de dominio** → Agregar en `packages/types/src/index.ts` (NO aquí)
-4. **Nueva función helper** → Agregar en `lib/utils.ts`
+4. **Nueva función helper** → Agregar en `lib/utils.ts`; export de informes → `lib/export-report.ts`
 5. **Nuevo schema zod** → Agregar en `lib/validations.ts`
 6. **Nuevo endpoint** → Agregar cliente en `lib/api.ts` + endpoint real en `backend/src/modules/`
 

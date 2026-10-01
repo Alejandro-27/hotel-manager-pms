@@ -65,6 +65,7 @@ import type {
   BusinessSettings,
 } from "@/lib/types"
 import { formatCurrency, periodRangeLabel } from "@/lib/utils"
+import { NumericInput } from "@/components/ui/numeric-input"
 import { exportReportXlsx } from "@/lib/export-report"
 import { ReportsPrintDoc } from "@/components/reports-print-doc"
 
@@ -317,7 +318,7 @@ export function ReportsView() {
 
   async function handleCreateExpense() {
     const amount = Number(expenseForm.amount)
-    if (!expenseForm.date || Number.isNaN(amount) || amount < 0) {
+    if (!expenseForm.date || expenseForm.amount.trim() === "" || !Number.isFinite(amount) || amount <= 0) {
       setExpenseError("Introduce un importe valido")
       return
     }
@@ -1055,13 +1056,14 @@ export function ReportsView() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="expense-amount">Importe</Label>
-              <Input
+              <NumericInput
                 id="expense-amount"
-                type="number"
+                mode="decimal"
                 min="0"
                 step="0.01"
+                autoComplete="off"
                 value={expenseForm.amount}
-                onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
+                onValueChange={(amount) => setExpenseForm({ ...expenseForm, amount })}
               />
             </div>
             <div className="grid gap-2">

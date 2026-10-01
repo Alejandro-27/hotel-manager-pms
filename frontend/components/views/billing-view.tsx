@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   Table,
@@ -53,6 +52,7 @@ import { api } from "@/lib/api"
 import { createPortal } from "react-dom"
 import type { Invoice, Guest, Reservation, Room, Product, BusinessSettings } from "@/lib/types"
 import { formatCurrency } from "@/lib/utils"
+import { NumericInput } from "@/components/ui/numeric-input"
 import { InvoiceVoucher } from "@/components/invoice-voucher"
 import { invoiceStatusConfig } from "@/lib/constants"
 
@@ -581,12 +581,13 @@ function PaymentDialog({
         <div className="grid gap-4 py-2">
           <div className="grid gap-2">
             <Label htmlFor="pay-amount">Monto</Label>
-            <Input
+            <NumericInput
               id="pay-amount"
-              type="number"
+              mode="decimal"
               min="1"
+              step="0.01"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onValueChange={setAmount}
             />
           </div>
           <div className="grid gap-2">

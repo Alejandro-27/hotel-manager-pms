@@ -17,14 +17,14 @@ Documento de **estado dinámico** del proyecto. Complementa a `AGENTS.md` (conve
 - Fecha: 2026-09-30 · Rama: `main` · Último commit: `726bfce` (docs: memoria del proyecto)
 - Pendiente de commit: auditoría de 7 fases (seguridad, privacidad/legal, consentimiento, accesibilidad, veracidad, docs).
 - Revertidos los cambios **visuales** de esa auditoría a petición del usuario: la estética previa (tipografía, tarjetas, tokens de color, variantes `dark:`, opacidades, textos) queda intacta. Lo único que se conserva del trabajo visual son atributos sin impacto (`aria-*`, `role`, `id`/`tabIndex` de foco) y la funcionalidad (legal, datos del negocio, consentimientos, analítica retirada).
-- Código fuente: sin errores de tipos (`tsc --noEmit` limpio en frontend y backend), lint 0 errores / 6 warnings (4 preexistentes + 2 de `_geist`/`_geistMono` en `app/layout.tsx`, también presentes en HEAD), `pnpm test` 41/41, `pnpm build` OK.
+- Código fuente: sin errores de tipos (`tsc --noEmit` limpio en frontend y backend), lint 0 errores / 6 warnings (4 preexistentes + 2 de `_geist`/`_geistMono` en `app/layout.tsx`, también presentes en HEAD), `pnpm test` 54/54, `pnpm build` OK.
 - `pnpm test:api` **27/27 verificado** (2026-09-30): Docker activo y migración `0003` reparada. Antes no se pudo ejecutar porque Docker estaba caído y la migración estaba rota (ver gotcha).
 
 ## Conteos verificados (fuentes: comandos de test)
 
 | Recurso | Conteo | Fuente |
 |---|---|---|
-| Frontend | 41 tests | `pnpm test` |
+| Frontend | 54 tests | `pnpm test` |
 | Backend | 27 tests | `pnpm test:api` (verificado 2026-09-30, 27/27) |
 | Bruno | 46 requests | `backend/bruno/` |
 

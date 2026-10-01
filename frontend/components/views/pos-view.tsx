@@ -69,6 +69,7 @@ import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth-context"
 import type { Product, Reservation, Guest, Room, SaleItem } from "@/lib/types"
 import { formatCurrency } from "@/lib/utils"
+import { NumericInput } from "@/components/ui/numeric-input"
 import { productFormSchema } from "@/lib/validations"
 
 type ProductCategory = "desayunos" | "snacks" | "bebidas"
@@ -777,12 +778,11 @@ function InventoryTable({
                         <TableCell className="text-muted-foreground">{formatCurrency(product.price)}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <Input
-                              type="number"
+                            <NumericInput
+                              mode="integer"
                               min="0"
-                              value={Number.isNaN(stockVal) ? "" : stockVal}
-                              onChange={(e) => {
-                                const raw = e.target.value
+                              value={Number.isNaN(stockVal) ? "" : String(stockVal)}
+                              onValueChange={(raw) => {
                                 const n = raw === "" ? Number.NaN : Number(raw)
                                 setStockMap((prev) => ({ ...prev, [product.id]: n }))
                               }}
@@ -1032,35 +1032,35 @@ function ProductFormDialog({
             </div>
             <div className="grid gap-2">
               <Label htmlFor="product-price">Precio</Label>
-              <Input
+              <NumericInput
                 id="product-price"
-                type="number"
+                mode="decimal"
                 min="0"
                 step="0.01"
                 value={form.price}
-                onChange={(e) => setForm({ ...form, price: e.target.value })}
+                onValueChange={(price) => setForm({ ...form, price })}
               />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
               <Label htmlFor="product-stock">Stock actual</Label>
-              <Input
+              <NumericInput
                 id="product-stock"
-                type="number"
+                mode="integer"
                 min="0"
                 value={form.currentStock}
-                onChange={(e) => setForm({ ...form, currentStock: e.target.value })}
+                onValueChange={(currentStock) => setForm({ ...form, currentStock })}
               />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="product-minstock">Stock minimo</Label>
-              <Input
+              <NumericInput
                 id="product-minstock"
-                type="number"
+                mode="integer"
                 min="0"
                 value={form.minStock}
-                onChange={(e) => setForm({ ...form, minStock: e.target.value })}
+                onValueChange={(minStock) => setForm({ ...form, minStock })}
               />
             </div>
           </div>

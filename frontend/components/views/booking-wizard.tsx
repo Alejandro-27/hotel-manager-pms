@@ -26,6 +26,7 @@ import Link from "next/link"
 import { api } from "@/lib/api"
 import type { Guest, Room } from "@/lib/types"
 import { formatCurrency } from "@/lib/utils"
+import { NumericInput } from "@/components/ui/numeric-input"
 
 const paymentMethods = ["efectivo", "tarjeta", "transferencia"] as const
 
@@ -280,12 +281,12 @@ export function BookingWizard({
             </div>
             <div className="grid gap-2">
               <Label>Numero de huespedes</Label>
-              <Input
-                type="number"
+              <NumericInput
+                mode="integer"
                 min="1"
                 max="5"
                 value={numGuests}
-                onChange={(e) => setNumGuests(e.target.value)}
+                onValueChange={setNumGuests}
               />
             </div>
             <Separator />

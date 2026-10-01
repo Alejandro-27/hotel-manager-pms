@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cn, formatCurrency, periodRangeLabel } from './utils'
+import { cn, formatCurrency, periodRangeLabel, sanitizeDecimalInput, sanitizeIntegerInput, isBlockedNumberKey } from './utils'
 import { buildReportSheetRows, reportFileName } from './export-report'
 
 describe('cn', () => {
@@ -105,5 +105,59 @@ describe('periodRangeLabel', () => {
     const result = periodRangeLabel(1, new Date(2026, 8, 25))
     const start = result.split(' - ')[0]
     expect(start).toContain('2026')
+  })
+})
+
+describe('sanitizeDecimalInput', () => {
+  it('keeps valid decimal input', () => {
+    expect(sanitizeDecimalInput('125.50')).toBe('125.50')
+  })
+
+  it('strips letters and symbols', () => {
+    expect(sanitizeDecimalInput('12abc')).toBe('12')
+    expect(sanitizeDecimalInput('1e5')).toBe('15')
+    expect(sanitizeDecimalInput('$ 40')).toBe('40')
+  })
+
+  it('accepts comma as decimal separator', () => {
+    expect(sanitizeDecimalInput('12,5')).toBe('12.5')
+  })
+
+  it('allows only one decimal separator and two decimals', () => {
+    expect(sanitizeDecimalInput('1.2.3')).toBe('1.23')
+    expect(sanitizeDecimalInput('9.999')).toBe('9.99')
+  })
+
+  it('returns empty string when there is no digit', () => {
+    expect(sanitizeDecimalInput('')).toBe('')
+    expect(sanitizeDecimalInput('abc')).toBe('')
+  })
+})
+
+describe('sanitizeIntegerInput', () => {
+  it('keeps only digits', () => {
+    expect(sanitizeIntegerInput('12abc')).toBe('12')
+    expect(sanitizeIntegerInput('1.5')).toBe('15')
+    expect(sanitizeIntegerInput('$ 40')).toBe('40')
+  })
+
+  it('returns empty string when there is no digit', () => {
+    expect(sanitizeIntegerInput('')).toBe('')
+    expect(sanitizeIntegerInput('abc')).toBe('')
+  })
+})
+
+describe('isBlockedNumberKey', () => {
+  it('blocks exponent and sign keys', () => {
+    expect(isBlockedNumberKey('e')).toBe(true)
+    expect(isBlockedNumberKey('E')).toBe(true)
+    expect(isBlockedNumberKey('+')).toBe(true)
+    expect(isBlockedNumberKey('-')).toBe(true)
+  })
+
+  it('allows digits, decimals and editing keys', () => {
+    expect(isBlockedNumberKey('5')).toBe(false)
+    expect(isBlockedNumberKey('.')).toBe(false)
+    expect(isBlockedNumberKey('Backspace')).toBe(false)
   })
 })

@@ -28,6 +28,7 @@ import { AlertCircle, ChevronLeft, ChevronRight, Plus, RefreshCw, XCircle } from
 import Link from "next/link"
 import { api } from "@/lib/api"
 import { formatCurrency } from "@/lib/utils"
+import { NumericInput } from "@/components/ui/numeric-input"
 import { roomStatusConfig } from "@/lib/constants"
 import type { Room, Reservation, Guest, RoomStatus } from "@/lib/types"
 
@@ -392,7 +393,7 @@ export function CalendarView() {
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="num-guests">Numero de Huespedes</Label>
-                <Input id="num-guests" type="number" min="1" max="5" value={formGuests} onChange={(e) => setFormGuests(e.target.value)} />
+                <NumericInput id="num-guests" mode="integer" min="1" max="5" value={formGuests} onValueChange={setFormGuests} />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="payment-method">Metodo de pago</Label>

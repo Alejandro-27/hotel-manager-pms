@@ -44,6 +44,7 @@ import {
 import { api } from "@/lib/api"
 import { roomStatusConfig as statusConfig, roomTypeLabels as typeLabels } from "@/lib/constants"
 import { formatCurrency } from "@/lib/utils"
+import { NumericInput } from "@/components/ui/numeric-input"
 import type { Room, RoomStatus, Reservation, Guest } from "@/lib/types"
 
 interface NewRoomForm {
@@ -453,10 +454,12 @@ export function RoomsView() {
                 </div>
                 <div>
                   <Label className="text-sm">Tarifa por noche</Label>
-                  <Input
-                    type="number"
+                  <NumericInput
+                    mode="decimal"
+                    min="0"
+                    step="0.01"
                     value={editPrice}
-                    onChange={(e) => setEditPrice(e.target.value)}
+                    onValueChange={setEditPrice}
                     className="mt-1"
                   />
                 </div>
@@ -493,12 +496,13 @@ export function RoomsView() {
               </div>
               <div>
                 <Label className="text-sm">Planta</Label>
-                <Input
-                  type="number"
+                <NumericInput
+                  mode="integer"
+                  min="0"
                   placeholder="6"
                   className="mt-1"
                   value={newRoom.floor}
-                  onChange={(e) => setNewRoom({ ...newRoom, floor: e.target.value })}
+                  onValueChange={(floor) => setNewRoom({ ...newRoom, floor })}
                 />
               </div>
             </div>
@@ -518,22 +522,25 @@ export function RoomsView() {
               </div>
               <div>
                 <Label className="text-sm">Capacidad maxima</Label>
-                <Input
-                  type="number"
+                <NumericInput
+                  mode="integer"
+                  min="1"
                   className="mt-1"
                   value={newRoom.maxCapacity}
-                  onChange={(e) => setNewRoom({ ...newRoom, maxCapacity: e.target.value })}
+                  onValueChange={(maxCapacity) => setNewRoom({ ...newRoom, maxCapacity })}
                 />
               </div>
             </div>
             <div>
               <Label className="text-sm">Tarifa por noche</Label>
-              <Input
-                type="number"
+              <NumericInput
+                mode="decimal"
+                min="0"
+                step="0.01"
                 placeholder="150"
                 className="mt-1"
                 value={newRoom.pricePerNight}
-                onChange={(e) => setNewRoom({ ...newRoom, pricePerNight: e.target.value })}
+                onValueChange={(pricePerNight) => setNewRoom({ ...newRoom, pricePerNight })}
               />
             </div>
             <DialogFooter>

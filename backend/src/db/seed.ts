@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import { db, client } from './index.js'
 import {
-  users, rooms, guests, reservations, products, sales, invoices, expenses,
+  users, rooms, guests, reservations, products, sales, invoices, expenses, settings,
   type NewRoom, type NewGuest, type NewReservation, type NewProduct, type NewSale,
   type NewInvoice, type NewExpense,
 } from './schema.js'
@@ -152,6 +152,16 @@ async function seed() {
   await db.insert(sales).values(saleData)
   await db.insert(invoices).values(invoiceData)
   await db.insert(expenses).values(expenseData)
+  await db.insert(settings).values({
+    id: 'main',
+    legalName: '',
+    taxId: '',
+    address: '',
+    phone: '',
+    email: '',
+    jurisdiction: '',
+    updatedAt: now,
+  })
 
   console.log('Seed complete:')
   console.log(`  - ${roomData.length} rooms`)

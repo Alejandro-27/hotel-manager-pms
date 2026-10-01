@@ -32,7 +32,15 @@ export async function createGuest(input: CreateGuestInput) {
   if (existing) throw new AppError(409, `Ya existe un huésped con el documento ${input.document}`)
 
   const id = randomUUID()
-  await db.insert(guests).values({ id, ...input, createdAt: new Date().toISOString() })
+  await db.insert(guests).values({
+    id,
+    name: input.name,
+    document: input.document,
+    country: input.country ?? '',
+    email: input.email ?? '',
+    phone: input.phone ?? '',
+    createdAt: new Date().toISOString(),
+  })
   return getGuestById(id)
 }
 

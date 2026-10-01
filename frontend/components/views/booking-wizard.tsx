@@ -20,7 +20,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
+import { Checkbox } from "@/components/ui/checkbox"
 import { AlertTriangle, ChevronRight, UserCheck, AlertCircle } from "lucide-react"
+import Link from "next/link"
 import { api } from "@/lib/api"
 import type { Guest, Room } from "@/lib/types"
 import { formatCurrency } from "@/lib/utils"
@@ -65,6 +67,7 @@ export function BookingWizard({
   const [paymentMethod, setPaymentMethod] = useState<(typeof paymentMethods)[number]>("efectivo")
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [acceptCancellationPolicy, setAcceptCancellationPolicy] = useState(false)
 
   const matchingGuest = useMemo(() => {
     const doc = guestForm.document.trim().toLowerCase()
@@ -93,6 +96,7 @@ export function BookingWizard({
     setNumGuests("1")
     setPaymentMethod("efectivo")
     setError(null)
+    setAcceptCancellationPolicy(false)
   }
 
   function handleClose(open: boolean) {
@@ -138,6 +142,11 @@ export function BookingWizard({
   async function confirm() {
     setSubmitting(true)
     setError(null)
+    if (!acceptCancellationPolicy) {
+      setError("Debes aceptar la politica de cancelacion para confirmar la reserva")
+      setSubmitting(false)
+      return
+    }
     try {
       let guestId: string
       if (matchingGuest) {
@@ -146,9 +155,9 @@ export function BookingWizard({
         const created = await api.guests.create({
           name: guestForm.name.trim(),
           document: guestForm.document.trim(),
-          country: guestForm.country.trim() || "XX",
+          country: guestForm.country.trim(),
           email: guestForm.email.trim(),
-          phone: guestForm.phone.trim() || "000000",
+          phone: guestForm.phone.trim(),
         })
         guestId = created.id
       }
@@ -161,6 +170,7 @@ export function BookingWizard({
         guests: Number(numGuests) || 1,
         paymentMethod,
         advancePayment: advance,
+        acceptCancellationPolicy,
       })
 
       onError(null)
@@ -285,9 +295,11 @@ export function BookingWizard({
                 <p className="text-sm text-muted-foreground">No hay habitaciones libres para esa capacidad.</p>
               ) : (
                 availableRooms.map((room) => (
-                  <div
+                  <button
                     key={room.id}
-                    className={`flex items-center justify-between rounded-md border p-3 cursor-pointer transition-colors ${
+                    type="button"
+                    aria-pressed={selectedRoomId === room.id}
+                    className={`flex w-full items-center justify-between rounded-md border p-3 text-left cursor-pointer transition-colors ${
                       selectedRoomId === room.id
                         ? "border-primary bg-primary/10"
                         : "hover:bg-accent"
@@ -301,9 +313,9 @@ export function BookingWizard({
                     <div className="flex items-center gap-3">
                       <span className="text-xs text-muted-foreground">Max: {room.maxCapacity}</span>
                       <span className="font-semibold text-foreground">{formatCurrency(room.pricePerNight)}/noche</span>
-                      <ChevronRight className="size-4 text-muted-foreground" />
+                      <ChevronRight className="size-4 text-muted-foreground" aria-hidden="true" />
                     </div>
-                  </div>
+                  </button>
                 ))
               )}
             </div>
@@ -344,20 +356,48 @@ export function BookingWizard({
               </Select>
             </div>
             <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3">
-              <AlertTriangle className="size-4 text-amber-600 mt-0.5 shrink-0" />
+              <AlertTriangle className="size-4 text-amber-600 mt-0.5 shrink-0" aria-hidden="true" />
               <div>
                 <p className="text-sm font-medium text-amber-800">Politica de cancelacion</p>
                 <p className="text-xs text-amber-700 mt-0.5">
-                  Cancelaciones con menos de 24 horas de antelacion seran penalizadas con el 100% del anticipo.
+                  Cancelaciones con menos de 24 horas de antelacion no admiten reembolso del anticipo.
                 </p>
+                <Link
+                  href="/legal/reembolsos"
+                  target="_blank"
+                  className="mt-1 inline-block text-xs font-medium text-amber-800 underline"
+                >
+                  Ver condiciones completas
+                </Link>
               </div>
             </div>
+            <label className="flex cursor-pointer items-start gap-2 text-sm">
+              <Checkbox
+                id="accept-cancellation"
+                checked={acceptCancellationPolicy}
+                onCheckedChange={(v) => setAcceptCancellationPolicy(v === true)}
+                className="mt-0.5"
+              />
+              <span className="text-foreground">
+                He leido y acepto la{" "}
+                <Link
+                  href="/legal/reembolsos"
+                  target="_blank"
+                  className="font-medium text-primary underline"
+                >
+                  politica de cancelacion y reembolsos
+                </Link>
+              </span>
+            </label>
           </div>
         )}
 
         {error && (
-          <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-            <AlertCircle className="mt-0.5 size-4 shrink-0" />
+          <div
+            role="alert"
+            className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
+          >
+            <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
             <span>{error}</span>
           </div>
         )}
@@ -371,10 +411,10 @@ export function BookingWizard({
           {step < 3 ? (
             <Button onClick={nextStep} disabled={submitting}>
               Siguiente
-              <ChevronRight className="ml-1 size-4" />
+              <ChevronRight className="ml-1 size-4" aria-hidden="true" />
             </Button>
           ) : (
-            <Button onClick={confirm} disabled={submitting}>
+            <Button onClick={confirm} disabled={submitting || !acceptCancellationPolicy}>
               {submitting ? "Creando reserva..." : "Confirmar Reserva"}
             </Button>
           )}

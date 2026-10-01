@@ -1,0 +1,21 @@
+meta {
+  name: Update Settings (recepcion forbidden)
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/settings
+  headers {
+    Authorization: Bearer {{recepcionToken}}
+    Content-Type: application/json
+  }
+  body: json
+  {
+    "legalName": "No deberia guardarse"
+  }
+}
+
+assert {
+  res.status: 403
+}

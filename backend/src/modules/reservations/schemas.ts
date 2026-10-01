@@ -12,6 +12,9 @@ export const createReservationSchema = z.object({
   paymentMethod: z.enum(['efectivo', 'tarjeta', 'transferencia']),
   advancePayment: z.number().min(0).default(0),
   notes: z.string().default(''),
+  acceptCancellationPolicy: z.literal(true, {
+    error: 'Debes aceptar la política de cancelación',
+  }),
 })
 
 export const reservationParamsSchema = z.object({

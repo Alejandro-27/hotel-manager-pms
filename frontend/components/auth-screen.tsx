@@ -1,10 +1,12 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Building2, Eye, EyeOff, ArrowRight, UserPlus, LogIn, AlertCircle } from "lucide-react"
+import { Building2, Eye, EyeOff, ArrowRight, UserPlus, LogIn, AlertCircle, CalendarDays, Receipt, Store, BarChart3 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -28,7 +30,7 @@ export function AuthScreen() {
 
   const registerForm = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { name: "", email: "", hotelName: "", password: "", confirmPassword: "" },
+    defaultValues: { name: "", email: "", hotelName: "", password: "", confirmPassword: "", acceptTerms: false },
   })
 
   async function handleLogin(data: LoginFormData) {
@@ -82,27 +84,32 @@ export function AuthScreen() {
 
         <div className="relative z-10 space-y-6">
           <h2 className="text-4xl font-bold leading-tight text-balance">
-            Gestiona tu hotel de forma inteligente
+            Todo tu hotel en una sola plataforma
           </h2>
           <p className="text-lg text-sidebar-foreground/70 leading-relaxed max-w-md">
             Sistema integral de gestion hotelera con reservas, facturacion, punto de venta y control de inventario en una sola plataforma.
           </p>
+
           <div className="grid grid-cols-2 gap-4 pt-4">
             <div className="rounded-lg bg-sidebar-accent/40 p-4">
-              <p className="text-2xl font-bold">500+</p>
-              <p className="text-sm text-sidebar-foreground/60">Hoteles activos</p>
+              <CalendarDays className="mb-2 size-5" />
+              <p className="text-sm font-semibold">Reservas</p>
+              <p className="text-sm text-sidebar-foreground/60">Calendario, check-in y check-out</p>
             </div>
             <div className="rounded-lg bg-sidebar-accent/40 p-4">
-              <p className="text-2xl font-bold">98%</p>
-              <p className="text-sm text-sidebar-foreground/60">Satisfaccion</p>
+              <Receipt className="mb-2 size-5" />
+              <p className="text-sm font-semibold">Facturacion</p>
+              <p className="text-sm text-sidebar-foreground/60">Facturas, pagos y comprobantes</p>
             </div>
             <div className="rounded-lg bg-sidebar-accent/40 p-4">
-              <p className="text-2xl font-bold">24/7</p>
-              <p className="text-sm text-sidebar-foreground/60">Soporte tecnico</p>
+              <Store className="mb-2 size-5" />
+              <p className="text-sm font-semibold">Punto de venta</p>
+              <p className="text-sm text-sidebar-foreground/60">TPV de catering y control de stock</p>
             </div>
             <div className="rounded-lg bg-sidebar-accent/40 p-4">
-              <p className="text-2xl font-bold">+40%</p>
-              <p className="text-sm text-sidebar-foreground/60">Eficiencia</p>
+              <BarChart3 className="mb-2 size-5" />
+              <p className="text-sm font-semibold">Informes</p>
+              <p className="text-sm text-sidebar-foreground/60">KPIs y exportacion a XLSX y PDF</p>
             </div>
           </div>
         </div>
@@ -141,8 +148,8 @@ export function AuthScreen() {
             </TabsList>
 
             {error && (
-              <div className="mb-4 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <div role="alert" className="mb-4 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                 <span>{error}</span>
               </div>
             )}
@@ -212,7 +219,7 @@ export function AuthScreen() {
                     >
                       {loginLoading ? (
                         <span className="flex items-center gap-2">
-                          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                          <svg aria-hidden="true" className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                           </svg>
@@ -362,7 +369,7 @@ export function AuthScreen() {
                     >
                       {registerLoading ? (
                         <span className="flex items-center gap-2">
-                          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                          <svg aria-hidden="true" className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                           </svg>
@@ -376,16 +383,42 @@ export function AuthScreen() {
                       )}
                     </Button>
 
-                    <p className="text-center text-xs text-muted-foreground leading-relaxed">
-                      {"Al crear una cuenta aceptas nuestros "}
-                      <button type="button" className="text-primary hover:text-primary/80 underline underline-offset-2">
-                        Terminos de servicio
-                      </button>
-                      {" y "}
-                      <button type="button" className="text-primary hover:text-primary/80 underline underline-offset-2">
-                        Politica de privacidad
-                      </button>
-                    </p>
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-2 pt-1">
+                        <Checkbox
+                          id="reg-terms"
+                          name="acceptTerms"
+                          checked={registerForm.watch("acceptTerms")}
+                          onCheckedChange={(v) => registerForm.setValue("acceptTerms", v === true)}
+                          aria-required="true"
+                        />
+                        <Label htmlFor="reg-terms" className="text-xs font-normal text-muted-foreground leading-relaxed">
+                          {"Acepto los "}
+                          <Link
+                            href="/legal/terminos"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary underline underline-offset-2 hover:text-primary/80"
+                          >
+                            Terminos y Condiciones
+                          </Link>
+                          {" y la "}
+                          <Link
+                            href="/legal/privacidad"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary underline underline-offset-2 hover:text-primary/80"
+                          >
+                            Politica de Privacidad
+                          </Link>
+                        </Label>
+                      </div>
+                      {registerForm.formState.errors.acceptTerms && (
+                        <p role="alert" className="text-xs text-destructive">
+                          {registerForm.formState.errors.acceptTerms.message}
+                        </p>
+                      )}
+                    </div>
                   </form>
                 </CardContent>
               </Card>

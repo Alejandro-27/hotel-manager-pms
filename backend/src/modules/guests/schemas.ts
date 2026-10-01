@@ -1,11 +1,15 @@
 import { z } from 'zod/v4'
 
+function optionalText<T extends z.ZodType<string>>(schema: T) {
+  return z.union([z.literal(''), schema]).optional()
+}
+
 export const createGuestSchema = z.object({
   name: z.string().min(2, 'Nombre requerido'),
   document: z.string().min(3, 'Documento requerido'),
-  country: z.string().length(2, 'País en formato ISO 3166 (2 letras)'),
-  email: z.string().email('Email inválido'),
-  phone: z.string().min(6, 'Teléfono requerido'),
+  country: optionalText(z.string().trim().length(2, 'País en formato ISO 3166 (2 letras)')),
+  email: optionalText(z.string().trim().email('Email inválido')),
+  phone: optionalText(z.string().trim().min(6, 'Teléfono requerido')),
 })
 
 export const updateGuestSchema = createGuestSchema.partial()

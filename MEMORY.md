@@ -14,20 +14,26 @@ Documento de **estado dinámico** del proyecto. Complementa a `AGENTS.md` (conve
 
 ## Snapshot actual
 
-- Fecha: 2026-09-30 · Rama: `main` · Último commit: `c005a98` (fix: cambio del boton de 'Exportar' a 'Excel')
-- Pendiente de commit (creado en esta sesión): este `memory.md` y la actualización de `AGENTS.md`, `frontend/AGENTS.md`, `README.md` (conteos de tests 35→39, export CSV→XLSX, estructura nueva).
-- Código: working tree limpio a nivel de fuente (`next-env.d.ts` se revierte siempre tras `pnpm build`).
+- Fecha: 2026-09-30 · Rama: `main` · Último commit: `726bfce` (docs: memoria del proyecto)
+- Pendiente de commit: auditoría de 7 fases (seguridad, privacidad/legal, consentimiento, accesibilidad, veracidad, docs).
+- Revertidos los cambios **visuales** de esa auditoría a petición del usuario: la estética previa (tipografía, tarjetas, tokens de color, variantes `dark:`, opacidades, textos) queda intacta. Lo único que se conserva del trabajo visual son atributos sin impacto (`aria-*`, `role`, `id`/`tabIndex` de foco) y la funcionalidad (legal, datos del negocio, consentimientos, analítica retirada).
+- Código fuente: sin errores de tipos (`tsc --noEmit` limpio en frontend y backend), lint 0 errores / 6 warnings (4 preexistentes + 2 de `_geist`/`_geistMono` en `app/layout.tsx`, también presentes en HEAD), `pnpm test` 41/41, `pnpm build` OK.
+- `pnpm test:api` **27/27 verificado** (2026-09-30): Docker activo y migración `0003` reparada. Antes no se pudo ejecutar porque Docker estaba caído y la migración estaba rota (ver gotcha).
 
 ## Conteos verificados (fuentes: comandos de test)
 
 | Recurso | Conteo | Fuente |
 |---|---|---|
-| Frontend | 39 tests | `pnpm test` |
-| Backend | 20 tests | `pnpm test:api` (requiere PostgreSQL) |
-| Bruno | 41 requests | `backend/bruno/` |
+| Frontend | 41 tests | `pnpm test` |
+| Backend | 27 tests | `pnpm test:api` (verificado 2026-09-30, 27/27) |
+| Bruno | 46 requests | `backend/bruno/` |
 
 ## Decisiones recientes (con su porqué)
 
+- **Sin `@vercel/analytics`**: no era necesario para un PMS interno y no queremos terceros recebendo datos de uso.
+- **Consentimientos sin persistencia**: `acceptTerms` y `acceptCancellationPolicy` se exigen en API y UI, pero no se guardan (decisión del usuario; evita migración y dado personal extra). Consecuencia: las páginas legales NO deben afirmar que el consentimiento queda registrado.
+- **Datos fiscales en tabla `settings`** (fila única `main`) y no en `users`: es un solo negocio por instalación y así el informe/voucher leen de una fuente. `GET` es para cualquier autenticado, `PATCH` solo admin. La migración `0003` inserta la fila `main` para que instalaciones existentes no queden sin datos.
+- **Campos de huésped opcionales** (`country`, `email`, `phone`): antes obligatorios y el frontend rellenaba datos ficticios (`XX`, `000000`). Ahora el schema acepta vacío o ausencia.
 - **XLSX en vez de CSV** para exportar informes (`write-excel-file@4.1.1`): csv no permite header formateado; se descartó exceljs (21MB + polyfills browser) y SheetJS free (sin estilos, npm desactualizado). Header con celdas combinadas A:D, fondos, números reales con formato `$#,##0` y fila Total.
 - **PDF via `window.print()`** (patrón `.print-only`/portal a body), sin dependencias; se descartó jsPDF. Setea `document.title` antes de imprimir (nombre de archivo sugerido).
 - **Factura en curso** en el backend: factura real durante la estancia, noches completas `checkIn→checkOut`, cargos del TPV sincronizados al instante (`syncInvoiceForReservation` en `billing/service.ts`, upsert en `pos/service.ts`).
@@ -43,7 +49,8 @@ Documento de **estado dinámico** del proyecto. Complementa a `AGENTS.md` (conve
 
 ## Log de cambios recientes (podar lo viejo)
 
-- `c005a98` fix: boton 'Exportar' → 'Excel'
+- (sin commit) auditoría 7 fases: settings del negocio, páginas /legal/*, consentimientos, accesibilidad, claims veraces, docs
+- `726bfce` docs: memoria del proyecto + documentación actualizada
 - `f89ee01` feat: informes exportables en XLSX y PDF con header del hotel
 - `b02394b` feat: exportacion PDF e header del hotel en informes
 - `9fe2ef2` feat: factura en curso refleja los cargos del TPV al instante
@@ -55,12 +62,17 @@ Documento de **estado dinámico** del proyecto. Complementa a `AGENTS.md` (conve
 - `write-excel-file`: tipar los rows como `Row[]` explícito cuando hay `...map()` en el literal (si no, TS ensancha `align` a `string`); `SheetOptions` es genérico (no anotar, dejar inferir). v4 browser **no usa Web Workers** (zipper async).
 - `.print-only` ya está en `globals.css` (`display:none` fuera de @media print) — es el patrón para impresión.
 - Backend: imports con `.js`; queries `(await db.select()...)[0]` (pg no tiene `.get()`).
+- `next/font/google` con Next 16: `Geist(...)` no expone `.variable`. **NO** poner `geist.className`/`geistMono.className` en el `<body>`: el body queda con `font-sans` y las consts se declaran sin usar (`_geist`/`_geistMono`) — aplicar la clase de la fuente en el body renderiza el sitio entero en Geist Mono (el orden de clases CSS, no del HTML, decide cuál gana).
+- **Migraciones `.sql` generadas: no editarlas a mano sin validar.** `drizzle-kit generate` escribe `CREATE TABLE ...\n);` + `\n--> statement-breakpoint`. Al añadir statements a mano se puede perder el `);` y la migración falla en silencio: `src/index.ts` hace `migrate()` **antes** de `app.listen()`, así que el backend muere y **nada escucha en el 3001**; el navegador lo reporta como `CORS request did not succeed / Status code (null)`, que es conexión rechazada, no un problema de CORS. Diagnóstico: `ss -ltn | grep 3001` (vacío = caído) y `SELECT count(*) FROM drizzle.__drizzle_migrations` vs entradas del `_journal.json` (si falta una, la migración no corrió).
+- `tsx watch` solo vigila `.ts`: editar un `.sql` de migración NO reinicia el backend; hay que relanzar `pnpm dev` para que el `migrate()` del arranque se ejecute.
+- `tsc --noEmit` en frontend lee `.next/types/validator.ts`: si da errores raros de `Route`, borrar `.next` y reconstruir.
+- Bruno: requests que validan bloqueo por rol usan `{{recepcionToken}}`, que rellena `auth/login-recepcion.bru`.
 
 ## Checklist si algo cambia
 
 Al tocar lo siguiente, actualizar estos ficheros/puntos:
 
-- Conteos de tests → `AGENTS.md` raíz, `frontend/AGENTS.md`, `README.md`
+- Conteos de tests → `AGENTS.md` raíz, `frontend/AGENTS.md`, `backend/AGENTS.md`, `README.md`
 - `lib/utils.ts` / `lib/export-report.ts` / `components/reports-print-doc.tsx` → descripciones de estructura en README/AGENTS
 - Nuevo endpoint/colección → `backend/AGENTS.md` + Bruno (mantener sincronizado)
 - Schema DB → regenerar migración + re-seed (advertencia ya en AGENTS.md)

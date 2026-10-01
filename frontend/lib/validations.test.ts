@@ -26,8 +26,31 @@ describe('registerSchema', () => {
       hotelName: 'Hotel Test',
       password: '12345678',
       confirmPassword: '12345678',
+      acceptTerms: true,
     })
     expect(result.success).toBe(true)
+  })
+
+  it('rejects registration without accepting terms', () => {
+    const result = registerSchema.safeParse({
+      name: 'John Doe',
+      email: 'john@email.com',
+      hotelName: 'Hotel Test',
+      password: '12345678',
+      confirmPassword: '12345678',
+      acceptTerms: false,
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects registration without the terms field', () => {
+    const result = registerSchema.safeParse({
+      name: 'John Doe',
+      email: 'john@email.com',
+      password: '12345678',
+      confirmPassword: '12345678',
+    })
+    expect(result.success).toBe(false)
   })
 
   it('rejects mismatched passwords', () => {
@@ -37,6 +60,7 @@ describe('registerSchema', () => {
       hotelName: 'Hotel Test',
       password: '12345678',
       confirmPassword: '87654321',
+      acceptTerms: true,
     })
     expect(result.success).toBe(false)
   })
@@ -48,6 +72,7 @@ describe('registerSchema', () => {
       hotelName: 'Hotel Test',
       password: '12345678',
       confirmPassword: '12345678',
+      acceptTerms: true,
     })
     expect(result.success).toBe(false)
   })
@@ -58,6 +83,7 @@ describe('registerSchema', () => {
       email: 'john@email.com',
       password: '123456',
       confirmPassword: '123456',
+      acceptTerms: true,
     })
     expect(result.success).toBe(false)
   })
@@ -68,6 +94,7 @@ describe('registerSchema', () => {
       email: 'john@email.com',
       password: '12345678',
       confirmPassword: '12345678',
+      acceptTerms: true,
     })
     expect(result.success).toBe(true)
   })

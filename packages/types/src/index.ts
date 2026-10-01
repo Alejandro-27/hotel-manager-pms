@@ -87,3 +87,14 @@ export interface Expense {
   date: string
   note: string
 }
+
+export interface BusinessSettings {
+  legalName: string
+  taxId: string
+  address: string
+  phone: string
+  email: string
+  jurisdiction: string
+}
+
+export type BusinessSettingsUpdate = Partial<BusinessSettings>

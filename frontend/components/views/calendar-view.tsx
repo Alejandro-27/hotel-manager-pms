@@ -23,7 +23,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 import { AlertCircle, ChevronLeft, ChevronRight, Plus, RefreshCw, XCircle } from "lucide-react"
+import Link from "next/link"
 import { api } from "@/lib/api"
 import { formatCurrency } from "@/lib/utils"
 import { roomStatusConfig } from "@/lib/constants"
@@ -72,6 +74,7 @@ export function CalendarView() {
   const [formCheckOut, setFormCheckOut] = useState("")
   const [formGuests, setFormGuests] = useState("1")
   const [formPayment, setFormPayment] = useState<(typeof paymentMethods)[number]>("efectivo")
+  const [acceptCancellationPolicy, setAcceptCancellationPolicy] = useState(false)
 
   const [detailEntry, setDetailEntry] = useState<{ reservation: Reservation; guest: Guest | undefined } | null>(null)
   const [cancelling, setCancelling] = useState(false)
@@ -141,6 +144,7 @@ export function CalendarView() {
     setFormGuests("1")
     setFormPayment("efectivo")
     setCreateError(null)
+    setAcceptCancellationPolicy(false)
     setDialogOpen(true)
   }
 
@@ -174,6 +178,7 @@ export function CalendarView() {
         checkOut: formCheckOut,
         guests: Number(formGuests),
         paymentMethod: formPayment,
+        acceptCancellationPolicy,
       })
       setDialogOpen(false)
       fetchData()
@@ -209,14 +214,14 @@ export function CalendarView() {
           <p className="text-muted-foreground text-sm">Vista global tipo Gantt de la ocupacion</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={prevMonth}>
-            <ChevronLeft className="size-4" />
+          <Button variant="outline" size="icon" onClick={prevMonth} aria-label="Mes anterior">
+            <ChevronLeft className="size-4" aria-hidden="true" />
           </Button>
           <span className="text-sm font-medium min-w-[140px] text-center text-foreground">
             {monthNames[currentMonth]} {currentYear}
           </span>
-          <Button variant="outline" size="icon" onClick={nextMonth}>
-            <ChevronRight className="size-4" />
+          <Button variant="outline" size="icon" onClick={nextMonth} aria-label="Mes siguiente">
+            <ChevronRight className="size-4" aria-hidden="true" />
           </Button>
         </div>
       </div>
@@ -239,7 +244,7 @@ export function CalendarView() {
       {error && (
         <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
           <div className="flex items-center gap-2">
-            <AlertCircle className="size-4 shrink-0" />
+            <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
             <span>{error}</span>
           </div>
           <Button variant="outline" size="sm" onClick={fetchData}>
@@ -306,8 +311,9 @@ export function CalendarView() {
                       const isToday = dateStr === formatDate(today.getFullYear(), today.getMonth(), today.getDate())
 
                       return (
-                        <div
+                        <button
                           key={day}
+                          type="button"
                           className={`flex-1 min-w-[38px] border-r h-[36px] cursor-pointer transition-colors ${
                             entry
                               ? "bg-primary/20 hover:bg-primary/30"
@@ -321,6 +327,9 @@ export function CalendarView() {
                               ? `${entry.guest?.name} - ${entry.reservation.status}`
                               : `Disponible - Click para reservar`
                           }
+                          aria-label={`Hab. ${room.number}, ${dateStr}, ${
+                            entry ? `reservada por ${entry.guest?.name}` : "disponible"
+                          }`}
                         >
                           {entry && (
                             <div className="h-full flex items-center justify-center">
@@ -331,7 +340,7 @@ export function CalendarView() {
                               </div>
                             </div>
                           )}
-                        </div>
+                        </button>
                       )
                     })}
                   </div>
@@ -399,16 +408,36 @@ export function CalendarView() {
                 </Select>
               </div>
             </div>
+            <label className="flex cursor-pointer items-start gap-2 text-sm">
+              <Checkbox
+                id="calendar-accept-cancellation"
+                checked={acceptCancellationPolicy}
+                onCheckedChange={(v) => setAcceptCancellationPolicy(v === true)}
+                className="mt-0.5"
+              />
+              <span className="text-foreground">
+                El huesped acepta la{" "}
+                <Link href="/legal/reembolsos" target="_blank" className="font-medium text-primary underline">
+                  politica de cancelacion
+                </Link>
+              </span>
+            </label>
             {createError && (
-              <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <div
+                role="alert"
+                className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
+              >
+                <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                 <span>{createError}</span>
               </div>
             )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleCreateReservation} disabled={creating || !formGuestId}>
+            <Button
+              onClick={handleCreateReservation}
+              disabled={creating || !formGuestId || !acceptCancellationPolicy}
+            >
               {creating ? (
                 <span className="flex items-center gap-2">
                   <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
@@ -419,7 +448,7 @@ export function CalendarView() {
                 </span>
               ) : (
                 <>
-                  <Plus className="mr-2 size-4" />
+                  <Plus className="mr-2 size-4" aria-hidden="true" />
                   Crear Reserva
                 </>
               )}
@@ -479,7 +508,7 @@ export function CalendarView() {
               )}
               {cancelError && (
                 <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                   <span>{cancelError}</span>
                 </div>
               )}

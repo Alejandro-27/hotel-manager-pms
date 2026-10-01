@@ -216,7 +216,7 @@ export function PosView() {
 
       {actionError && (
         <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-          <AlertCircle className="mt-0.5 size-4 shrink-0" />
+          <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <span>{actionError}</span>
         </div>
       )}
@@ -224,7 +224,7 @@ export function PosView() {
       {error && (
         <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
           <div className="flex items-center gap-2">
-            <AlertCircle className="size-4 shrink-0" />
+            <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
             <span>{error}</span>
           </div>
           <Button variant="outline" size="sm" onClick={fetchData}>
@@ -317,12 +317,22 @@ function ProductGrid({
                 return (
                   <Card
                     key={product.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-disabled={product.currentStock <= 0}
+                    aria-label={`${product.name}, ${formatCurrency(product.price)}, stock ${product.currentStock}`}
                     className={`cursor-pointer transition-all hover:shadow-md ${
                       inCart ? "ring-2 ring-primary" : ""
                     } ${isLowStock ? "border-destructive/50" : ""} ${
                       product.currentStock <= 0 ? "opacity-50 pointer-events-none" : ""
                     }`}
                     onClick={() => onAdd(product)}
+                    onKeyDown={(e) => {
+                      if (product.currentStock > 0 && (e.key === "Enter" || e.key === " ")) {
+                        e.preventDefault()
+                        onAdd(product)
+                      }
+                    }}
                   >
                     <CardContent className="p-3">
                       <div className="flex items-start justify-between mb-2">
@@ -423,27 +433,30 @@ function CartSidebar({
                       variant="outline"
                       size="icon"
                       className="size-7"
+                      aria-label={`Quitar una unidad de ${item.product.name}`}
                       onClick={() => onUpdateQuantity(item.product.id, -1)}
                     >
-                      <Minus className="size-3" />
+                      <Minus className="size-3" aria-hidden="true" />
                     </Button>
                     <span className="w-6 text-center text-sm font-medium text-foreground">{item.quantity}</span>
                     <Button
                       variant="outline"
                       size="icon"
                       className="size-7"
+                      aria-label={`Anadir una unidad de ${item.product.name}`}
                       disabled={item.quantity >= item.product.currentStock}
                       onClick={() => onUpdateQuantity(item.product.id, 1)}
                     >
-                      <Plus className="size-3" />
+                      <Plus className="size-3" aria-hidden="true" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
                       className="size-7 text-destructive hover:text-destructive"
+                      aria-label={`Eliminar ${item.product.name} del carrito`}
                       onClick={() => onRemove(item.product.id)}
                     >
-                      <Trash2 className="size-3" />
+                      <Trash2 className="size-3" aria-hidden="true" />
                     </Button>
                   </div>
                 </div>
@@ -718,7 +731,7 @@ function InventoryTable({
             </Select>
             {isAdmin && (
               <Button size="sm" onClick={() => setDialog({ mode: "create" })}>
-                <Plus className="mr-1 size-4" />
+                <Plus className="mr-1 size-4" aria-hidden="true" />
                 Nuevo Producto
               </Button>
             )}
@@ -846,7 +859,7 @@ function InventoryTable({
                                   setDeleting(product)
                                 }}
                               >
-                                <Trash2 className="size-4" />
+                                <Trash2 className="size-4" aria-hidden="true" />
                                 <span className="sr-only">Eliminar</span>
                               </Button>
                             </div>
@@ -884,7 +897,7 @@ function InventoryTable({
           </AlertDialogHeader>
           {deleteError && (
             <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
               <span>{deleteError}</span>
             </div>
           )}
@@ -1053,7 +1066,7 @@ function ProductFormDialog({
           </div>
           {error && (
             <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
               <span>{error}</span>
             </div>
           )}

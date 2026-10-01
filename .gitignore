@@ -17,6 +17,8 @@ dist/
 # Environment
 .env
 .env*.local
+.env*.production
+.env*.development
 
 # Debug logs
 pnpm-debug.log*

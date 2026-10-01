@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
-import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
 import { AuthProvider } from '@/lib/auth-context'
 import { Toaster } from '@/components/ui/sonner'
@@ -39,6 +38,9 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <body className="font-sans antialiased">
+        <a href="#contenido-principal" className="skip-link">
+          Saltar al contenido principal
+        </a>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -50,7 +52,6 @@ export default function RootLayout({
           </AuthProvider>
         </ThemeProvider>
         <Toaster richColors closeButton position="top-right" />
-        <Analytics />
       </body>
     </html>
   )

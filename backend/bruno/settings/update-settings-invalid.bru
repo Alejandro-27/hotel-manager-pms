@@ -1,0 +1,21 @@
+meta {
+  name: Update Settings (invalid email)
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{baseUrl}}/api/settings
+  headers {
+    Authorization: Bearer {{token}}
+    Content-Type: application/json
+  }
+  body: json
+  {
+    "email": "no-es-un-email"
+  }
+}
+
+assert {
+  res.status: 400
+}

@@ -1,6 +1,6 @@
 "use client"
 
-import type { Invoice, Guest, Reservation, Room } from "@/lib/types"
+import type { Invoice, Guest, Reservation, Room, BusinessSettings } from "@/lib/types"
 import { formatCurrency } from "@/lib/utils"
 import { invoiceStatusConfig } from "@/lib/constants"
 
@@ -10,9 +10,17 @@ interface InvoiceVoucherProps {
   reservation: Reservation | null | undefined
   room: Room | null | undefined
   productName: (productId: string) => string | undefined
+  business?: Partial<BusinessSettings>
 }
 
-export function InvoiceVoucher({ invoice, guest, reservation, room, productName }: InvoiceVoucherProps) {
+export function InvoiceVoucher({
+  invoice,
+  guest,
+  reservation,
+  room,
+  productName,
+  business = {},
+}: InvoiceVoucherProps) {
   const status = invoiceStatusConfig[invoice.status]
 
   return (
@@ -22,8 +30,10 @@ export function InvoiceVoucher({ invoice, guest, reservation, room, productName 
         <div className="voucher-logo">
           <div className="voucher-logo-icon">H</div>
           <div>
-            <h1 className="voucher-hotel-name">HotelManager</h1>
-            <p className="voucher-hotel-sub">PMS & POS</p>
+            <h1 className="voucher-hotel-name">{business.legalName || "HotelManager"}</h1>
+            <p className="voucher-hotel-sub">
+              {business.taxId ? `NIF/RUC: ${business.taxId}` : "PMS & POS"}
+            </p>
           </div>
         </div>
         <div className={`voucher-stamp ${status.stampClass}`}>{status.label}</div>
@@ -95,6 +105,21 @@ export function InvoiceVoucher({ invoice, guest, reservation, room, productName 
           <p className="voucher-small">Monto de esta factura</p>
         </div>
         <p className="voucher-final-amount">{formatCurrency(invoice.totalDue)}</p>
+      </div>
+
+      <div className="voucher-invoice-info">
+        {business.legalName || business.taxId || business.address ? (
+          <p className="voucher-small">
+            {[business.legalName, business.taxId, business.address, business.phone, business.email]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+        ) : (
+          <p className="voucher-small">
+            Emisor sin datos fiscales configurados. Configuralos en Configuracion &gt; Negocio para
+            que los comprobantes incluyan los datos de emisor exigidos en tu pais.
+          </p>
+        )}
       </div>
 
       <div className="voucher-footer">

@@ -5,6 +5,9 @@ export const registerSchema = z.object({
   email: z.string().email('Email inválido'),
   password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
   hotelName: z.string().optional(),
+  acceptTerms: z.literal(true, {
+    error: 'Debes aceptar los términos y la política de privacidad',
+  }),
 })
 
 export const loginSchema = z.object({

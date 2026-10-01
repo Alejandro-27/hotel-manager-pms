@@ -1,0 +1,12 @@
+meta {
+  name: Get Settings
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/settings
+  headers {
+    Authorization: Bearer {{token}}
+  }
+}

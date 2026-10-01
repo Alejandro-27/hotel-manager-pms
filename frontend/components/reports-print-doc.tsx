@@ -1,4 +1,5 @@
 import { formatCurrency } from "@/lib/utils"
+import type { BusinessSettings } from "@/lib/types"
 
 export interface ReportsPrintDocProps {
   hotelName: string
@@ -13,6 +14,7 @@ export interface ReportsPrintDocProps {
   totalRooms: number
   revPerRoom: number
   monthly: { month: string; ingresos: number; gastos: number }[]
+  business?: Partial<BusinessSettings>
 }
 
 function KpiItem({ label, value }: { label: string; value: string }) {
@@ -37,6 +39,7 @@ export function ReportsPrintDoc({
   totalRooms,
   revPerRoom,
   monthly,
+  business,
 }: ReportsPrintDocProps) {
   return (
     <div className="report-print bg-white p-8 text-gray-900">
@@ -96,7 +99,12 @@ export function ReportsPrintDoc({
       </section>
 
       <footer className="mt-8 border-t border-dashed border-gray-300 pt-3 text-center text-[11px] text-gray-500">
-        HotelManager PMS
+        <p>
+          {[business?.legalName, business?.taxId, business?.address, business?.email]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+        <p className="mt-1">Documento generado por HotelManager PMS</p>
       </footer>
     </div>
   )

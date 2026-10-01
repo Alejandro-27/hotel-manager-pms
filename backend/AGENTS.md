@@ -28,11 +28,11 @@ pnpm test             # Vitest (fastify.inject contra BD hotel_manager_test)
 src/
 ├── app.ts              ← buildApp(): Fastify + CORS + plugins + rutas (exportado para Vercel)
 ├── index.ts            ← migrate on boot + listen (PORT 3001)
-├── api.test.ts         ← Tests de API (fastify.inject, 20 tests)
+├── api.test.ts         ← Tests de API (fastify.inject, 27 tests)
 ├── config/env.ts       ← DATABASE_URL, JWT_SECRET, PORT, CORS_ORIGIN
 ├── db/
 │   ├── index.ts        ← postgres client (pool max: 10) + drizzle instance
-│   ├── schema.ts       ← 8 tablas: users, rooms, guests, reservations, products, sales, invoices, expenses
+│   ├── schema.ts       ← 9 tablas: users, rooms, guests, reservations, products, sales, invoices, expenses, settings
 │   ├── migrate.ts      ← drizzle-orm/postgres-js/migrator
 │   └── seed.ts         ← 20 rooms, 8 guests, 8 reservations, 14 products, 4 sales, 3 invoices, 12 expenses
 ├── plugins/
@@ -46,6 +46,7 @@ src/
     ├── pos/            ← CRUD products + POST sales (transactions) + stock (cargo a habitación crea/actualiza factura en curso)
     ├── billing/        ← GET invoices + GET invoice/:id + POST pay + syncInvoiceForReservation (upsert factura en estancia/check-out)
     ├── expenses/       ← CRUD gastos (list all roles, create/delete admin)
+    ├── settings/       ← GET (todos los roles) + PATCH (admin) datos legales del negocio
     └── reports/        ← GET dashboard, financial (?months=), occupancy
 test/
 └── global-setup.ts     ← Crea BD de test + migra + siembra admin
@@ -171,6 +172,8 @@ await db.delete(rooms).where(eq(rooms.id, id))
 | GET | /api/expenses | Sí | Lista gastos (desc por fecha) |
 | POST | /api/expenses | Admin | Crear gasto |
 | DELETE | /api/expenses/:id | Admin | Eliminar gasto |
+| GET | /api/settings | Sí | Datos legales/fiscales del negocio (fila `main`) |
+| PATCH | /api/settings | Admin | Actualiza datos legales/fiscales |
 | GET | /api/reports/dashboard | Sí | KPIs: occupancy, dailyRevenue, pendingCheckins/Checkouts |
 | GET | /api/reports/financial | Admin | Resumen financiero (query: months 1–24, default 6) |
 | GET | /api/reports/occupancy | Sí | Ocupación por tipo (filtro: month YYYY-MM) |
@@ -181,7 +184,7 @@ await db.delete(rooms).where(eq(rooms.id, id))
 - **Pooling**: max 10 conexiones
 - **Migraciones**: `drizzle-kit generate` genera SQL, auto-apply en server start
 - **Seed**: idempotente (skip si users existen), cierra conexión al terminar
-- **Tablas**: users, rooms, guests, reservations, products, sales, invoices, expenses
+- **Tablas**: users, rooms, guests, reservations, products, sales, invoices, expenses, settings
 - **Foreign keys**: reservations→guests+rooms, sales→rooms, invoices→reservations+guests, expenses→users (createdBy)
 
 ## Testing (Vitest)
@@ -210,10 +213,11 @@ services:
 
 ## Bruno Collection
 
-Colección de 41 requests en `backend/bruno/` para testing de API:
+Colección de 46 requests en `backend/bruno/` para testing de API:
 - Importar en Bruno → seleccionar entorno `dev` (baseUrl: localhost:3001)
 - Login automático: register/login scripts guardan `{{token}}`
-- Organizado por módulo: health/, auth/, rooms/, guests/, reservations/, pos/, billing/, reports/ (incluye gastos: list/create/delete)
+- Organizado por módulo: health/, auth/, rooms/, guests/, reservations/, pos/, billing/, settings/, reports/ (incluye gastos: list/create/delete)
+- `auth/login-recepcion.bru` guarda `{{recepcionToken}}` (usado por requests que validan bloqueo de recepcion)
 
 ## Credenciales de desarrollo
 

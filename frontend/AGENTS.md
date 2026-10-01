@@ -14,7 +14,7 @@
 pnpm dev          # Next.js dev server (localhost:3000)
 pnpm build        # Build producción
 pnpm lint         # ESLint
-pnpm test         # Vitest + React Testing Library (39 tests)
+pnpm test         # Vitest + React Testing Library (41 tests)
 ```
 
 ## Estructura
@@ -24,7 +24,8 @@ pnpm test         # Vitest + React Testing Library (39 tests)
 │   ├── page.tsx            ← Página principal: controla auth + routing por view activa
 │   ├── layout.tsx          ← Root layout con ThemeProvider + Sidebar + Toaster de sonner
 │   ├── globals.css         ← CSS variables light/dark + estilos base
-│   └── designs/page.tsx    ← Página estática de mockups (solo imágenes)
+│   ├── designs/page.tsx    ← Página estática de mockups (solo imágenes)
+│   └── legal/              ← Páginas legales (privacidad, terminos, reembolsos)
 ├── components/
 │   ├── app-sidebar.tsx     ← Sidebar de navegación (shadcn Sidebar)
 │   ├── auth-screen.tsx     ← Login/registro (validado con zod, JWT real)
@@ -78,7 +79,7 @@ pnpm test         # Vitest + React Testing Library (39 tests)
 ### Testing
 - Vitest + React Testing Library
 - Tests en `*.test.ts` junto al archivo fuente
-- 39 tests pasando (utils, api, auth-context, validaciones, export-report)
+- 41 tests pasando (utils, api, auth-context, validaciones, export-report)
 
 ## Vistas del sistema
 
@@ -90,7 +91,7 @@ pnpm test         # Vitest + React Testing Library (39 tests)
 | TPV | `pos-view.tsx` | Punto de venta catering + inventario |
 | Facturación | `billing-view.tsx` | Facturas y pagos |
 | Habitaciones | `rooms-view.tsx` | Grid de habitaciones + gestión |
-| Configuración | `settings-view.tsx` | Perfil, contraseña y tema (solo lo real) |
+| Configuración | `settings-view.tsx` | Perfil, contraseña, tema y datos del negocio (solo admin) |
 | Informes | `reports-view.tsx` | KPIs, financiero por periodo, gastos, export XLSX y PDF |
 
 ## Cosas que NO deben modificarse sin razón clara

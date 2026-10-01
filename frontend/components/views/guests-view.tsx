@@ -201,14 +201,14 @@ export function GuestsView() {
           <p className="text-muted-foreground text-sm">Gestiona los huespedes y sus reservas</p>
         </div>
         <Button onClick={openNewBooking}>
-          <Plus className="mr-2 size-4" />
+          <Plus className="mr-2 size-4" aria-hidden="true" />
           Nueva Reserva
         </Button>
       </div>
 
       {actionError && (
         <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-          <AlertCircle className="mt-0.5 size-4 shrink-0" />
+          <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <span>{actionError}</span>
         </div>
       )}
@@ -245,7 +245,7 @@ export function GuestsView() {
       {error && guestsData.length === 0 && (
         <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
           <div className="flex items-center gap-2">
-            <AlertCircle className="size-4 shrink-0" />
+            <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
             <span>{error}</span>
           </div>
           <Button variant="outline" size="sm" onClick={fetchData}>
@@ -422,7 +422,7 @@ export function GuestsView() {
               </div>
               {editError && (
                 <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                   <span>{editError}</span>
                 </div>
               )}

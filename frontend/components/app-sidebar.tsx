@@ -12,6 +12,7 @@ import {
   BedDouble,
   Hotel,
   LogOut,
+  Scale,
 } from "lucide-react"
 import {
   Sidebar,
@@ -86,10 +87,11 @@ export function AppSidebar({ activeView, onNavigate, userName, userEmail, onLogo
                 <SidebarMenuItem key={item.id}>
                   <SidebarMenuButton
                     isActive={activeView === item.id}
+                    aria-current={activeView === item.id ? "page" : undefined}
                     onClick={() => onNavigate(item.id)}
                     tooltip={item.title}
                   >
-                    <item.icon />
+                    <item.icon aria-hidden="true" />
                     <span>{item.title}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -113,10 +115,11 @@ export function AppSidebar({ activeView, onNavigate, userName, userEmail, onLogo
                     <SidebarMenuItem key={item.id}>
                       <SidebarMenuButton
                         isActive={activeView === item.id}
+                    aria-current={activeView === item.id ? "page" : undefined}
                         onClick={() => onNavigate(item.id)}
                         tooltip={item.title}
                       >
-                        <item.icon />
+                        <item.icon aria-hidden="true" />
                         <span>{item.title}</span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -142,10 +145,11 @@ export function AppSidebar({ activeView, onNavigate, userName, userEmail, onLogo
                     <SidebarMenuItem key={item.id}>
                       <SidebarMenuButton
                         isActive={activeView === item.id}
+                    aria-current={activeView === item.id ? "page" : undefined}
                         onClick={() => onNavigate(item.id)}
                         tooltip={item.title}
                       >
-                        <item.icon />
+                        <item.icon aria-hidden="true" />
                         <span>{item.title}</span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -167,6 +171,19 @@ export function AppSidebar({ activeView, onNavigate, userName, userEmail, onLogo
                 <span className="text-xs font-medium">{userName || "Administrador"}</span>
                 <span className="text-xs opacity-50">{userEmail || "admin@hotel.com"}</span>
               </div>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Informacion legal">
+              <a
+                href="/legal/privacidad"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2"
+              >
+                <Scale className="size-4" />
+                <span>Informacion legal</span>
+              </a>
             </SidebarMenuButton>
           </SidebarMenuItem>
           {onLogout && (

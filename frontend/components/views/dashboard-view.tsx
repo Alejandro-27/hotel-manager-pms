@@ -158,7 +158,7 @@ export function DashboardView() {
   if (error && !dashboard) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
-        <AlertTriangle className="size-10 text-destructive" />
+        <AlertTriangle className="size-10 text-destructive" aria-hidden="true" />
         <p className="text-sm text-muted-foreground">{error}</p>
         <Button onClick={load}><RefreshCw className="mr-1 size-4" /> Reintentar</Button>
       </div>
@@ -252,7 +252,7 @@ export function DashboardView() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Alertas de Inventario</CardTitle>
-            <AlertTriangle className="size-4 text-destructive" />
+            <AlertTriangle className="size-4 text-destructive" aria-hidden="true" />
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-foreground">{dashboard?.lowStockProducts.length ?? 0}</p>

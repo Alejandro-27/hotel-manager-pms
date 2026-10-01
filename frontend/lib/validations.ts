@@ -13,6 +13,7 @@ export const registerSchema = z.object({
   hotelName: z.string().optional(),
   password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
   confirmPassword: z.string(),
+  acceptTerms: z.boolean().refine((v) => v, 'Debes aceptar los terminos y la politica de privacidad'),
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'Las contraseñas no coinciden',
   path: ['confirmPassword'],

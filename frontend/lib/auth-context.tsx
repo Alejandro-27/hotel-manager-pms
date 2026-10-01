@@ -49,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: data.email,
       password: data.password,
       hotelName: data.hotelName,
+      acceptTerms: data.acceptTerms,
     })
     setUser(u)
   }, [])

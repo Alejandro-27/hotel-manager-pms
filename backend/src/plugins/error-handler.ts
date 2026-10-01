@@ -21,6 +21,10 @@ export default fp(async (app) => {
       })
     }
 
+    if (error.message === 'Not allowed by CORS') {
+      return reply.code(403).send({ error: 'Origen no permitido' })
+    }
+
     if ('validation' in error) {
       return reply.code(400).send({
         error: 'Datos inválidos',

@@ -51,10 +51,19 @@ import {
 } from "lucide-react"
 import { api } from "@/lib/api"
 import { createPortal } from "react-dom"
-import type { Invoice, Guest, Reservation, Room, Product } from "@/lib/types"
+import type { Invoice, Guest, Reservation, Room, Product, BusinessSettings } from "@/lib/types"
 import { formatCurrency } from "@/lib/utils"
 import { InvoiceVoucher } from "@/components/invoice-voucher"
 import { invoiceStatusConfig } from "@/lib/constants"
+
+const EMPTY_BUSINESS: BusinessSettings = {
+  legalName: "",
+  taxId: "",
+  address: "",
+  phone: "",
+  email: "",
+  jurisdiction: "",
+}
 
 export function BillingView() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
@@ -68,9 +77,25 @@ export function BillingView() {
   const [selectedInvoice, setSelectedInvoice] = useState<string | null>(null)
   const [payInvoice, setPayInvoice] = useState<Invoice | null>(null)
   const [printRoot, setPrintRoot] = useState<HTMLElement | null>(null)
+  const [business, setBusiness] = useState<BusinessSettings>(EMPTY_BUSINESS)
 
   useEffect(() => {
     setPrintRoot(document.body)
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    api.settings
+      .get()
+      .then((data) => {
+        if (!cancelled) setBusiness({ ...EMPTY_BUSINESS, ...data })
+      })
+      .catch(() => {
+        // el comprobante se emite sin datos de emisor; no bloquea la vista
+      })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const fetchData = useCallback(async () => {
@@ -141,7 +166,7 @@ export function BillingView() {
       {error && (
         <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
           <div className="flex items-center gap-2">
-            <AlertCircle className="size-4 shrink-0" />
+            <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
             <span>{error}</span>
           </div>
           <Button variant="outline" size="sm" onClick={fetchData}>
@@ -298,6 +323,7 @@ export function BillingView() {
                 reservation={invoiceReservation}
                 room={invoiceRoom}
                 productName={productName}
+                business={business}
               />
             </div>,
             printRoot,
@@ -578,7 +604,7 @@ function PaymentDialog({
           </div>
           {error && (
             <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
               <span>{error}</span>
             </div>
           )}

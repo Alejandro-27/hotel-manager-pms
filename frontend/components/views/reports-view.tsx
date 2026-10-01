@@ -54,7 +54,16 @@ import {
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Pie, PieChart, Cell } from "recharts"
 import { api, type FinancialReport, type OccupancyReport } from "@/lib/api"
 import { useAuth } from "@/lib/auth-context"
-import type { Invoice, Reservation, Room, Guest, Product, Sale, Expense } from "@/lib/types"
+import type {
+  Invoice,
+  Reservation,
+  Room,
+  Guest,
+  Product,
+  Sale,
+  Expense,
+  BusinessSettings,
+} from "@/lib/types"
 import { formatCurrency, periodRangeLabel } from "@/lib/utils"
 import { exportReportXlsx } from "@/lib/export-report"
 import { ReportsPrintDoc } from "@/components/reports-print-doc"
@@ -132,6 +141,7 @@ export function ReportsView() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [financial, setFinancial] = useState<FinancialReport | null>(null)
   const [occupancy, setOccupancy] = useState<OccupancyReport | null>(null)
+  const [business, setBusiness] = useState<Partial<BusinessSettings>>({})
 
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false)
@@ -164,8 +174,9 @@ export function ReportsView() {
         api.reports.occupancy(),
         isAdmin ? api.reports.financial(periodMonths[period] ?? 6) : Promise.resolve(null),
         isAdmin ? api.expenses.get() : Promise.resolve([] as Expense[]),
+        api.settings.get().catch(() => null),
       ])
-      const [r, g, res, p, s, inv, occ, fin, exp] = await base
+      const [r, g, res, p, s, inv, occ, fin, exp, biz] = await base
       setRooms(r)
       setGuests(g)
       setReservations(res)
@@ -175,6 +186,7 @@ export function ReportsView() {
       setOccupancy(occ)
       setFinancial(fin)
       setExpenses(exp)
+      if (biz) setBusiness(biz)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar los informes")
     } finally {
@@ -371,7 +383,7 @@ export function ReportsView() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Informes y KPIs</h1>
           <p className="text-muted-foreground text-sm">Metricas de rendimiento y analisis del hotel</p>
         </div>
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+<div className={`grid grid-cols-2 gap-4 ${isAdmin ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
           {[0, 1, 2, 3].map((i) => (
             <Card key={i}>
               <CardContent className="pt-5 pb-4">
@@ -423,7 +435,7 @@ export function ReportsView() {
       {error && (
         <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
           <div className="flex items-center gap-2">
-            <AlertCircle className="size-4 shrink-0" />
+            <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
             <span>{error}</span>
           </div>
           <Button variant="outline" size="sm" onClick={fetchData}>
@@ -450,22 +462,24 @@ export function ReportsView() {
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs text-muted-foreground font-medium">Beneficio Neto</p>
-              <div className="flex size-7 items-center justify-center rounded-md bg-primary/10">
-                <DollarSign className="size-3.5 text-primary" />
+        {isAdmin && (
+          <Card>
+            <CardContent className="pt-5 pb-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-muted-foreground font-medium">Beneficio Neto</p>
+                <div className="flex size-7 items-center justify-center rounded-md bg-primary/10">
+                  <DollarSign className="size-3.5 text-primary" aria-hidden="true" />
+                </div>
               </div>
-            </div>
-            <p className="text-xl font-bold text-foreground">{formatCurrency(netProfit)}</p>
-            <div className="flex items-center gap-1 mt-1">
-              <span className="text-xs text-muted-foreground">
-                margen: {totalRevenue > 0 ? Math.round((netProfit / totalRevenue) * 100) : 0}%
-              </span>
-            </div>
-          </CardContent>
-        </Card>
+              <p className="text-xl font-bold text-foreground">{formatCurrency(netProfit)}</p>
+              <div className="flex items-center gap-1 mt-1">
+                <span className="text-xs text-muted-foreground">
+                  margen: {totalRevenue > 0 ? Math.round((netProfit / totalRevenue) * 100) : 0}%
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
         <Card>
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center justify-between mb-2">
@@ -621,14 +635,14 @@ export function ReportsView() {
                     <CardDescription>Desglose de gastos por concepto</CardDescription>
                   </div>
                   <Button size="sm" onClick={() => { setExpenseError(null); setExpenseDialogOpen(true) }}>
-                    <Plus className="mr-1 size-4" />
+                    <Plus className="mr-1 size-4" aria-hidden="true" />
                     Nuevo gasto
                   </Button>
                 </CardHeader>
                 <CardContent>
                   {expenseError && (
                     <div className="mb-3 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-                      <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                      <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                       <span>{expenseError}</span>
                     </div>
                   )}
@@ -659,7 +673,7 @@ export function ReportsView() {
                               disabled={deletingExpense === e.id}
                               onClick={() => handleDeleteExpense(e.id)}
                             >
-                              <Trash2 className="size-4" />
+                              <Trash2 className="size-4" aria-hidden="true" />
                               <span className="sr-only">Eliminar gasto</span>
                             </Button>
                           </TableCell>
@@ -1085,6 +1099,7 @@ export function ReportsView() {
                 totalRooms={occupancy?.totalRooms ?? rooms.length}
                 revPerRoom={revPerRoom}
                 monthly={monthlyRevenue}
+                business={business}
               />
             </div>,
             printRoot,

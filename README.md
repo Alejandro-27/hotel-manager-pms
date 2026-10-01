@@ -51,10 +51,10 @@ frontend/         → Next.js (consume la API real)
     utils.ts        → Utilidades (cn, formatCurrency, periodRangeLabel)
     export-report.ts→ Export XLSX de informes (write-excel-file)
 backend/          → Fastify API (auth JWT + PostgreSQL/Drizzle)
-  src/modules/    → auth, rooms, guests, reservations, pos, billing, expenses, reports
+  src/modules/    → auth, rooms, guests, reservations, pos, billing, expenses, settings, reports
   src/db/         → Schema Drizzle, migraciones y seed
   test/           → Tests e2e de API (Vitest) contra BD dedicada
-  bruno/          → Colección Bruno (41 requests) para probar la API
+  bruno/          → Colección Bruno (46 requests) para probar la API
 docker-compose.yml → PostgreSQL 16 local
 packages/
   types/          → @hotel/types — tipos de dominio compartidos
@@ -72,10 +72,12 @@ Servidor en `http://localhost:3001`. Login: `admin@hotel.com` / `Admin123!` (adm
 - **TPV** — Punto de venta de catering e inventario
 - **Facturación** — Facturas y pagos
 - **Habitaciones** — Gestión de habitaciones
-- **Configuración** — Perfil, contraseña y tema
-- **Informes** — KPIs, informe financiero por periodo, gastos y export a XLSX/PDF
+- **Configuración** — Perfil, contraseña, tema y datos legales/fiscales del negocio (solo admin)
+- **Informes** — KPIs, informe financiero por periodo, gastos y export a XLSX/PDF (financiero y gastos: solo admin)
 
 ## Estado actual
 
 - Frontend completo conectado a la API real (auth JWT, sin datos mock excepto `/designs`)
-- Backend completo: auth JWT con refresh, habitaciones, huéspedes, reservas (checkin/checkout/cancel), POS, facturación, gastos e informes sobre PostgreSQL (Drizzle), con migraciones, seed y tests
+- Backend completo: auth JWT con refresh, habitaciones, huéspedes, reservas (checkin/checkout/cancel), POS, facturación, gastos, datos legales del negocio e informes sobre PostgreSQL (Drizzle), con migraciones, seed y tests
+- Páginas legales en `/legal/privacidad`, `/legal/terminos` y `/legal/reembolsos` (**plantillas sin revisión jurídica**)
+- Consentimientos (`acceptTerms`, `acceptCancellationPolicy`) obligatorios en registro y reservas; se validan pero no se persisten

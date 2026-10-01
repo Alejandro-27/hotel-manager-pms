@@ -15,7 +15,7 @@ Sistema de gestión hotelera (PMS) y punto de venta (POS) para catering. Monorep
 - **Tipos compartidos**: `@hotel/types` en `packages/types/`
 - **Package manager**: pnpm (NO npm)
 - **Testing**: Vitest + React Testing Library (frontend)
-- **API testing**: Bruno collection en `backend/bruno/` (41 requests)
+- **API testing**: Bruno collection en `backend/bruno/` (46 requests)
 
 ## Inicio rápido
 
@@ -37,8 +37,8 @@ pnpm dev:api                                  # Backend en http://localhost:3001
 | `pnpm build` | Build frontend |
 | `pnpm build:api` | Build backend (tsc → `dist/`) |
 | `pnpm lint` | ESLint frontend |
-| `pnpm test` | Vitest frontend (39 tests) |
-| `pnpm test:api` | Vitest backend (20 tests, requiere PostgreSQL) |
+| `pnpm test` | Vitest frontend (41 tests) |
+| `pnpm test:api` | Vitest backend (27 tests, requiere PostgreSQL) |
 | `docker compose up -d` | Levantar PostgreSQL |
 | `pnpm --filter @hotel/backend db:migrate` | Aplicar migraciones |
 | `pnpm --filter @hotel/backend db:generate` | Generar migración desde schema |
@@ -55,10 +55,13 @@ frontend/                   ← @hotel/frontend — Next.js (consume la API real
 │   ├── page.tsx            ← Página principal, controla auth + routing
 │   ├── layout.tsx          ← Root layout (+ Toaster de sonner)
 │   ├── globals.css         ← Theme variables light/dark
-│   └── designs/page.tsx    ← Página estática de mockups
+│   ├── designs/page.tsx    ← Página estática de mockups
+│   └── legal/              ← Páginas legales (/legal/privacidad, /legal/terminos, /legal/reembolsos)
 ├── components/
 │   ├── app-sidebar.tsx     ← Navegación lateral
-│   ├── auth-screen.tsx     ← Login/registro (validado con zod)
+│   ├── auth-screen.tsx     ← Login/registro (validado con zod, exige acceptTerms)
+│   ├── invoice-voucher.tsx ← Voucher imprimible de factura (datos del negocio)
+│   ├── theme-toggle.tsx    ← Selector light/dark/system
 │   ├── reports-print-doc.tsx ← Documento print-only del informe (PDF)
 │   ├── ui/                 ← ~50 shadcn/ui components
 │   └── views/              ← 8 vistas principales del sistema
@@ -82,11 +85,11 @@ backend/                    ← @hotel/backend — Fastify API (PostgreSQL)
 ├── src/
 │   ├── app.ts              ← Instancia Fastify (exportada para Vercel)
 │   ├── index.ts            ← Entry point (migrate + listen)
-│   ├── api.test.ts         ← Tests de API (fastify.inject, 20 tests)
+│   ├── api.test.ts         ← Tests de API (fastify.inject, 27 tests)
 │   ├── config/env.ts       ← Variables de entorno
 │   ├── db/
 │   │   ├── index.ts        ← Conexión PostgreSQL (postgres-js)
-│   │   ├── schema.ts       ← Schema Drizzle (8 tablas)
+│   │   ├── schema.ts       ← Schema Drizzle (9 tablas)
 │   │   ├── migrate.ts      ← Runner de migraciones
 │   │   └── seed.ts         ← Datos de ejemplo
 │   ├── plugins/
@@ -100,10 +103,11 @@ backend/                    ← @hotel/backend — Fastify API (PostgreSQL)
 │       ├── pos/            ← Ventas, stock, cargo a habitación
 │       ├── billing/        ← Facturas automáticas + pagos
 │       ├── expenses/       ← Gastos operativos (CRUD)
+│       ├── settings/       ← Datos legales del negocio (GET todos, PATCH admin)
 │       └── reports/        ← Dashboard, financiero, ocupación
 ├── test/global-setup.ts    ← Crea BD de test + migra + siembra admin
 ├── vitest.config.ts        ← Config de tests (BD hotel_manager_test)
-├── bruno/                  ← Colección Bruno (41 requests)
+├── bruno/                  ← Colección Bruno (46 requests)
 ├── drizzle/                ← Migraciones generadas
 ├── docker-compose.yml      ← PostgreSQL 16
 ├── .env                    ← Variables de entorno (NO commitear)
@@ -184,7 +188,7 @@ backend/                    ← @hotel/backend — Fastify API (PostgreSQL)
 ## Reglas para testing
 
 - **Frontend**: Vitest + React Testing Library, tests unitarios en `*.test.ts`
-- **Backend**: Vitest (fastify.inject) contra una BD PostgreSQL dedicada (`hotel_manager_test`); testing manual con Bruno (41 requests)
+- **Backend**: Vitest (fastify.inject) contra una BD PostgreSQL dedicada (`hotel_manager_test`); testing manual con Bruno (46 requests)
 - Cobertura mínima: helpers de utilidad, lógica de negocio, componentes críticos
 
 ## Reglas para dependencias
@@ -207,6 +211,9 @@ backend/                    ← @hotel/backend — Fastify API (PostgreSQL)
 - Backend: auth JWT con refresh tokens (cookie de 7d), pero sin revocación server-side de refresh
 - Rate limiting solo en `/api/auth/login`, `/api/auth/register` y `/api/auth/refresh` (global 300/min); desactivado bajo `NODE_ENV=test`
 - Logging: pino con redacción de credenciales, sin correlación entre microservicios
+- Páginas legales (`/legal/*`) son plantillas redactadas sin revisión jurídica; validar con abogado antes de producción
+- `acceptTerms` y `acceptCancellationPolicy` se validan pero no se persisten: no hay registro de consentimiento
+- Sin verificación visual automatizada (browser bridge roto); revisar light/dark, foco y responsive a mano en `pnpm dev`
 
 ## CI/CD
 

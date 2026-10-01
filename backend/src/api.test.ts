@@ -17,7 +17,7 @@ async function registerUser(email: string, name = 'Usuario Test'): Promise<strin
   const res = await app.inject({
     method: 'POST',
     url: '/api/auth/register',
-    payload: { name, email, password: 'Password123!' },
+    payload: { name, email, password: 'Password123!', acceptTerms: true },
   })
   expect(res.statusCode).toBe(201)
   return (res.json() as { token: string }).token
@@ -47,6 +47,15 @@ describe('autenticacion', () => {
     expect(res.statusCode).toBe(401)
   })
 
+  it('rechaza registro sin aceptar terminos', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/auth/register',
+      payload: { name: 'Sin Consentimiento', email: `sincons-${Date.now()}@test.com`, password: 'Password123!' },
+    })
+    expect(res.statusCode).toBe(400)
+  })
+
   it('rechaza login con credenciales invalidas', async () => {
     const res = await app.inject({
       method: 'POST',
@@ -65,6 +74,99 @@ describe('autenticacion', () => {
     })
     expect(res.statusCode).toBe(200)
     expect(res.json().role).toBe('recepcion')
+  })
+})
+
+describe('settings', () => {
+  it('expone los datos del negocio a cualquier usuario autenticado', async () => {
+    const recepcionToken = await registerUser(`settings-read-${Date.now()}@test.com`)
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/settings',
+      headers: { authorization: `Bearer ${recepcionToken}` },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toHaveProperty('legalName')
+  })
+
+  it('requiere autenticacion para leer los datos del negocio', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/settings' })
+    expect(res.statusCode).toBe(401)
+  })
+
+  it('el admin actualiza los datos del negocio', async () => {
+    const adminToken = await loginAsAdmin()
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/settings',
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { legalName: 'Hotel Paraiso S.L.', taxId: 'B12345678' },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().legalName).toBe('Hotel Paraiso S.L.')
+    expect(res.json().taxId).toBe('B12345678')
+  })
+
+  it('rechaza datos del negocio invalidos', async () => {
+    const adminToken = await loginAsAdmin()
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/settings',
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { email: 'no-es-un-email' },
+    })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('solo el admin puede modificar los datos del negocio', async () => {
+    const recepcionToken = await registerUser(`settings-rw-${Date.now()}@test.com`, 'Recepcion Settings')
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/settings',
+      headers: { authorization: `Bearer ${recepcionToken}` },
+      payload: { legalName: 'No deberia guardarse' },
+    })
+    expect(res.statusCode).toBe(403)
+  })
+})
+
+describe('consentimientos de reserva', () => {
+  it('rechaza crear reserva sin aceptar la politica de cancelacion', async () => {
+    const token = await registerUser(`consent-${Date.now()}@test.com`)
+    const adminToken = await loginAsAdmin()
+
+    const guest = await app.inject({
+      method: 'POST',
+      url: '/api/guests',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { name: 'Huesped Consent', document: `CN${Date.now()}` },
+    })
+    expect(guest.statusCode).toBe(201)
+
+    const room = await app.inject({
+      method: 'POST',
+      url: '/api/rooms',
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { number: `C-${Date.now()}`, floor: 1, type: 'doble', maxCapacity: 2, pricePerNight: 90 },
+    })
+    expect(room.statusCode).toBe(201)
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/reservations',
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        guestId: (guest.json() as { id: string }).id,
+        roomId: (room.json() as { id: string }).id,
+        checkIn: '2026-11-01',
+        checkOut: '2026-11-03',
+        guests: 1,
+        paymentMethod: 'efectivo',
+        advancePayment: 0,
+        notes: '',
+      },
+    })
+    expect(res.statusCode).toBe(400)
   })
 })
 
@@ -307,6 +409,7 @@ describe('reservas y productos', () => {
         guests: 1,
         paymentMethod: 'efectivo',
         notes: '',
+        acceptCancellationPolicy: true,
       },
     })
     expect(created.statusCode).toBe(201)
@@ -460,6 +563,7 @@ describe('factura en curso por cargo a habitacion', () => {
         paymentMethod: 'efectivo',
         advancePayment: 0,
         notes: '',
+        acceptCancellationPolicy: true,
       },
     })
     expect(created.statusCode).toBe(201)

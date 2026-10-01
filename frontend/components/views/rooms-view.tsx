@@ -186,7 +186,7 @@ export function RoomsView() {
   if (error && rooms.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
-        <AlertTriangle className="size-10 text-destructive" />
+        <AlertTriangle className="size-10 text-destructive" aria-hidden="true" />
         <p className="text-sm text-muted-foreground">{error}</p>
         <Button onClick={load}><RefreshCw className="mr-1 size-4" /> Reintentar</Button>
       </div>
@@ -201,14 +201,14 @@ export function RoomsView() {
           <p className="text-muted-foreground text-sm">Administra habitaciones, estados y tarifas</p>
         </div>
         <Button onClick={() => setAddDialogOpen(true)}>
-          <Plus className="mr-1 size-4" />
+          <Plus className="mr-1 size-4" aria-hidden="true" />
           Nueva Habitacion
         </Button>
       </div>
 
       {error && (
         <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-          <AlertTriangle className="size-4 shrink-0" />
+          <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />
           <span>{error}</span>
         </div>
       )}
@@ -220,8 +220,17 @@ export function RoomsView() {
           return (
             <Card
               key={status}
+              role="button"
+              tabIndex={0}
+              aria-pressed={filterStatus === status}
               className={`cursor-pointer transition-all ${filterStatus === status ? "ring-2 ring-primary" : ""}`}
               onClick={() => setFilterStatus(filterStatus === status ? "all" : status)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault()
+                  setFilterStatus(filterStatus === status ? "all" : status)
+                }
+              }}
             >
               <CardContent className="pt-4 pb-4">
                 <div className="flex items-center gap-3">
@@ -530,7 +539,7 @@ export function RoomsView() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setAddDialogOpen(false)} disabled={saving}>Cancelar</Button>
               <Button onClick={handleCreateRoom} disabled={saving}>
-                {saving ? "Creando..." : (<><Plus className="mr-1 size-4" /> Crear Habitacion</>)}
+                {saving ? "Creando..." : (<><Plus className="mr-1 size-4" aria-hidden="true" /> Crear Habitacion</>)}
               </Button>
             </DialogFooter>
           </div>

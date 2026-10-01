@@ -96,6 +96,17 @@ export const expenses = pgTable('expenses', {
   createdAt: text('created_at').notNull(),
 })
 
+export const settings = pgTable('settings', {
+  id: text('id').primaryKey().default('main'),
+  legalName: text('legal_name').notNull().default(''),
+  taxId: text('tax_id').notNull().default(''),
+  address: text('address').notNull().default(''),
+  phone: text('phone').notNull().default(''),
+  email: text('email').notNull().default(''),
+  jurisdiction: text('jurisdiction').notNull().default(''),
+  updatedAt: text('updated_at').notNull(),
+})
+
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
 export type Room = typeof rooms.$inferSelect
@@ -112,3 +123,5 @@ export type Invoice = typeof invoices.$inferSelect
 export type NewInvoice = typeof invoices.$inferInsert
 export type Expense = typeof expenses.$inferSelect
 export type NewExpense = typeof expenses.$inferInsert
+export type Settings = typeof settings.$inferSelect
+export type NewSettings = typeof settings.$inferInsert

@@ -1,0 +1,20 @@
+meta {
+  name: Login (recepcion)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/auth/login
+  body: json
+  {
+    "email": "recepcion@hotel.com",
+    "password": "Admin123!"
+  }
+}
+
+script:post-response {
+  if (res.status === 200) {
+    bru.setVar("recepcionToken", res.body.token)
+  }
+}

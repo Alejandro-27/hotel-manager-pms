@@ -12,11 +12,22 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Shield, Palette, Save, UserRound, AlertCircle, Loader2 } from "lucide-react"
+import type { BusinessSettings } from "@/lib/types"
+import { Shield, Palette, Save, UserRound, AlertCircle, Loader2, Building2 } from "lucide-react"
+
+const EMPTY_BUSINESS: BusinessSettings = {
+  legalName: "",
+  taxId: "",
+  address: "",
+  phone: "",
+  email: "",
+  jurisdiction: "",
+}
 
 export function SettingsView() {
   const { theme, setTheme } = useTheme()
   const { user, refreshUser } = useAuth()
+  const isAdmin = user?.role === "admin"
 
   const [name, setName] = useState(user?.name ?? "")
   const [hotelName, setHotelName] = useState(user?.hotelName ?? "")
@@ -28,12 +39,58 @@ export function SettingsView() {
   const [changingPw, setChangingPw] = useState(false)
   const [pwError, setPwError] = useState<string | null>(null)
 
+  const [business, setBusiness] = useState<BusinessSettings>(EMPTY_BUSINESS)
+  const [savingBusiness, setSavingBusiness] = useState(false)
+  const [loadingBusiness, setLoadingBusiness] = useState(false)
+
   useEffect(() => {
     if (user) {
       setName(user.name)
       setHotelName(user.hotelName ?? "")
     }
   }, [user])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!isAdmin) return
+    setLoadingBusiness(true)
+    api.settings
+      .get()
+      .then((data) => {
+        if (!cancelled) setBusiness({ ...EMPTY_BUSINESS, ...data })
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          toast.error(err instanceof Error ? err.message : "Error al cargar los datos del negocio")
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingBusiness(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isAdmin])
+
+  async function handleSaveBusiness() {
+    setSavingBusiness(true)
+    try {
+      const saved = await api.settings.update({
+        legalName: business.legalName.trim(),
+        taxId: business.taxId.trim(),
+        address: business.address.trim(),
+        phone: business.phone.trim(),
+        email: business.email.trim(),
+        jurisdiction: business.jurisdiction.trim(),
+      })
+      setBusiness({ ...EMPTY_BUSINESS, ...saved })
+      toast.success("Datos del negocio actualizados")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al guardar los datos del negocio")
+    } finally {
+      setSavingBusiness(false)
+    }
+  }
 
   async function handleSaveProfile() {
     setSaving(true)
@@ -88,6 +145,10 @@ export function SettingsView() {
           <TabsTrigger value="security" className="gap-1.5">
             <Shield className="size-3.5" />
             Seguridad
+          </TabsTrigger>
+          <TabsTrigger value="business" className="gap-1.5">
+            <Building2 className="size-3.5" />
+            Negocio
           </TabsTrigger>
           <TabsTrigger value="appearance" className="gap-1.5">
             <Palette className="size-3.5" />
@@ -146,7 +207,7 @@ export function SettingsView() {
               </div>
               <div className="flex justify-end">
                 <Button onClick={handleSaveProfile} disabled={saving}>
-                  {saving ? <Loader2 className="mr-1 size-4 animate-spin" /> : <Save className="mr-1 size-4" />}
+                  {saving ? <Loader2 className="mr-1 size-4 animate-spin" aria-hidden="true" /> : <Save className="mr-1 size-4" aria-hidden="true" />}
                   Guardar perfil
                 </Button>
               </div>
@@ -166,7 +227,7 @@ export function SettingsView() {
             <CardContent className="flex flex-col gap-4">
               {pwError && (
                 <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                   <span>{pwError}</span>
                 </div>
               )}
@@ -205,10 +266,103 @@ export function SettingsView() {
               </div>
               <div className="flex justify-end">
                 <Button variant="outline" onClick={handleChangePassword} disabled={changingPw}>
-                  {changingPw && <Loader2 className="mr-1 size-4 animate-spin" />}
+                  {changingPw && <Loader2 className="mr-1 size-4 animate-spin" aria-hidden="true" />}
                   Actualizar contrasena
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="business" className="mt-4 flex flex-col gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-foreground flex items-center gap-2">
+                <Building2 className="size-4" />
+                Datos del Negocio
+              </CardTitle>
+              <CardDescription>
+                Aparecen en las facturas, vouchers y documentos impressos. Si faltan Razon Social o
+                NIF, los comprobantes se emiten sin datos de emisor y puede que no cumplan los
+                requisitos fiscales que exija tu pais.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              {!isAdmin ? (
+                <p className="text-sm text-muted-foreground">
+                  Solo un administrador puede editar estos datos.
+                </p>
+              ) : (
+                <>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="biz-legal-name">Razon social</Label>
+                      <Input
+                        id="biz-legal-name"
+                        value={business.legalName}
+                        disabled={loadingBusiness}
+                        onChange={(e) => setBusiness({ ...business, legalName: e.target.value })}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="biz-tax-id">NIF / RUC / Identificacion fiscal</Label>
+                      <Input
+                        id="biz-tax-id"
+                        value={business.taxId}
+                        disabled={loadingBusiness}
+                        onChange={(e) => setBusiness({ ...business, taxId: e.target.value })}
+                      />
+                    </div>
+                    <div className="grid gap-2 sm:col-span-2">
+                      <Label htmlFor="biz-address">Domicilio fiscal</Label>
+                      <Input
+                        id="biz-address"
+                        value={business.address}
+                        disabled={loadingBusiness}
+                        onChange={(e) => setBusiness({ ...business, address: e.target.value })}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="biz-phone">Telefono</Label>
+                      <Input
+                        id="biz-phone"
+                        value={business.phone}
+                        disabled={loadingBusiness}
+                        onChange={(e) => setBusiness({ ...business, phone: e.target.value })}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="biz-email">Email de contacto</Label>
+                      <Input
+                        id="biz-email"
+                        type="email"
+                        value={business.email}
+                        disabled={loadingBusiness}
+                        onChange={(e) => setBusiness({ ...business, email: e.target.value })}
+                      />
+                    </div>
+                    <div className="grid gap-2 sm:col-span-2">
+                      <Label htmlFor="biz-jurisdiction">Jurisdiccion / Registro</Label>
+                      <Input
+                        id="biz-jurisdiction"
+                        value={business.jurisdiction}
+                        disabled={loadingBusiness}
+                        onChange={(e) => setBusiness({ ...business, jurisdiction: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end">
+                    <Button onClick={handleSaveBusiness} disabled={savingBusiness || loadingBusiness}>
+                      {savingBusiness ? (
+                        <Loader2 className="mr-1 size-4 animate-spin" aria-hidden="true" />
+                      ) : (
+                        <Save className="mr-1 size-4" aria-hidden="true" />
+                      )}
+                      Guardar datos del negocio
+                    </Button>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

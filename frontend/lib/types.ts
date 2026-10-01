@@ -7,6 +7,8 @@ export type {
   SaleItem,
   Invoice,
   Expense,
+  BusinessSettings,
+  BusinessSettingsUpdate,
   RoomStatus,
   ReservationStatus,
   InvoiceStatus,

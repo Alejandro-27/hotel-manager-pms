@@ -1,4 +1,4 @@
-import type { Room, Guest, Reservation, Product, SaleItem, Sale, Invoice, Expense } from './types'
+import type { Room, Guest, Reservation, Product, SaleItem, Sale, Invoice, Expense, BusinessSettings } from './types'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
 
@@ -128,7 +128,7 @@ export const api = {
   auth: {
     login: (data: { email: string; password: string }) =>
       request<AuthResponse>('/api/auth/login', { method: 'POST', body: JSON.stringify(data) }),
-    register: (data: { name: string; email: string; password: string; hotelName?: string }) =>
+    register: (data: { name: string; email: string; password: string; hotelName?: string; acceptTerms: boolean }) =>
       request<AuthResponse>('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }),
     me: () => request<AuthUser>('/api/auth/me'),
     logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
@@ -152,8 +152,13 @@ export const api = {
 
   guests: {
     get: (q?: string) => request<Guest[]>(`/api/guests${buildQuery({ q })}`),
-    create: (data: { name: string; document: string; country: string; email: string; phone: string }) =>
-      request<Guest>('/api/guests', { method: 'POST', body: JSON.stringify(data) }),
+    create: (data: {
+      name: string
+      document: string
+      country?: string
+      email?: string
+      phone?: string
+    }) => request<Guest>('/api/guests', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: string, data: Partial<Pick<Guest, 'name' | 'document' | 'country' | 'email' | 'phone'>>) =>
       request<Guest>(`/api/guests/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   },
@@ -170,6 +175,7 @@ export const api = {
       paymentMethod: Reservation['paymentMethod']
       advancePayment?: number
       notes?: string
+      acceptCancellationPolicy: boolean
     }) => request<Reservation>('/api/reservations', { method: 'POST', body: JSON.stringify(data) }),
     checkin: (id: string) => request<Reservation>(`/api/reservations/${id}/checkin`, { method: 'PATCH' }),
     checkout: (id: string) => request<Reservation>(`/api/reservations/${id}/checkout`, { method: 'PATCH' }),
@@ -227,5 +233,11 @@ export const api = {
     dashboard: () => request<DashboardReport>('/api/reports/dashboard'),
     financial: (months = 6) => request<FinancialReport>(`/api/reports/financial?months=${months}`),
     occupancy: () => request<OccupancyReport>('/api/reports/occupancy'),
+  },
+
+  settings: {
+    get: () => request<BusinessSettings>('/api/settings'),
+    update: (data: Partial<BusinessSettings>) =>
+      request<BusinessSettings>('/api/settings', { method: 'PATCH', body: JSON.stringify(data) }),
   },
 }

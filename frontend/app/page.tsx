@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import {
   SidebarProvider,
   SidebarInset,
@@ -80,7 +81,7 @@ export default function Page() {
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-auto p-4 lg:p-6">
+        <main id="contenido-principal" tabIndex={-1} className="flex-1 overflow-auto p-4 lg:p-6">
           {activeView === "dashboard" && <DashboardView />}
           {activeView === "calendar" && <CalendarView />}
           {activeView === "guests" && <GuestsView />}
@@ -89,6 +90,19 @@ export default function Page() {
           {activeView === "rooms" && <RoomsView />}
           {activeView === "settings" && <SettingsView />}
           {activeView === "reports" && <ReportsView />}
+
+          <footer className="mt-8 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 border-t pt-4 text-xs text-muted-foreground">
+            <span>&copy; {new Date().getFullYear()} {user.hotelName?.trim() || "HotelManager"}</span>
+            <Link href="/legal/privacidad" className="hover:text-foreground hover:underline">
+              Privacidad
+            </Link>
+            <Link href="/legal/terminos" className="hover:text-foreground hover:underline">
+              Terminos
+            </Link>
+            <Link href="/legal/reembolsos" className="hover:text-foreground hover:underline">
+              Cancelacion y reembolsos
+            </Link>
+          </footer>
         </main>
       </SidebarInset>
     </SidebarProvider>

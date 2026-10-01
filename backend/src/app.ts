@@ -13,6 +13,7 @@ import reservationRoutes from './modules/reservations/routes.js'
 import posRoutes from './modules/pos/routes.js'
 import billingRoutes from './modules/billing/routes.js'
 import expenseRoutes from './modules/expenses/routes.js'
+import settingsRoutes from './modules/settings/routes.js'
 import reportRoutes from './modules/reports/routes.js'
 import { env } from './config/env.js'
 
@@ -20,6 +21,7 @@ const normalizeOrigin = (value?: string) => value?.replace(/\/+$/, '') ?? value
 
 export function buildApp() {
   const app = Fastify({
+    trustProxy: env.nodeEnv === 'production',
     logger: {
       level: env.nodeEnv === 'production' ? 'info' : 'debug',
       redact: {
@@ -39,6 +41,14 @@ export function buildApp() {
 
   app.setValidatorCompiler(validatorCompiler)
   app.setSerializerCompiler(serializerCompiler)
+
+  if (env.nodeEnv === 'production') {
+    app.addHook('onRequest', async (req, reply) => {
+      if (req.headers['x-forwarded-proto'] === 'http') {
+        return reply.redirect(`https://${req.host}${req.url}`, 308)
+      }
+    })
+  }
 
   const allowedOrigins = new Set(
     env.corsOrigin.map((origin) => normalizeOrigin(origin) ?? '')
@@ -82,6 +92,7 @@ export function buildApp() {
   app.register(posRoutes)
   app.register(billingRoutes)
   app.register(expenseRoutes)
+  app.register(settingsRoutes)
   app.register(reportRoutes)
 
   return app

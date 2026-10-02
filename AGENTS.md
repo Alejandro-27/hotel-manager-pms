@@ -38,7 +38,7 @@ pnpm dev:api                                  # Backend en http://localhost:3001
 | `pnpm build:api` | Build backend (tsc → `dist/`) |
 | `pnpm lint` | ESLint frontend |
 | `pnpm test` | Vitest frontend (54 tests) |
-| `pnpm test:api` | Vitest backend (27 tests, requiere PostgreSQL) |
+| `pnpm test:api` | Vitest backend (33 tests, requiere PostgreSQL) |
 | `docker compose up -d` | Levantar PostgreSQL |
 | `pnpm --filter @hotel/backend db:migrate` | Aplicar migraciones |
 | `pnpm --filter @hotel/backend db:generate` | Generar migración desde schema |
@@ -85,11 +85,11 @@ backend/                    ← @hotel/backend — Fastify API (PostgreSQL)
 ├── src/
 │   ├── app.ts              ← Instancia Fastify (exportada para Vercel)
 │   ├── index.ts            ← Entry point (migrate + listen)
-│   ├── api.test.ts         ← Tests de API (fastify.inject, 27 tests)
+│   ├── api.test.ts         ← Tests de API (fastify.inject, 33 tests)
 │   ├── config/env.ts       ← Variables de entorno
 │   ├── db/
 │   │   ├── index.ts        ← Conexión PostgreSQL (postgres-js)
-│   │   ├── schema.ts       ← Schema Drizzle (9 tablas)
+│   │   ├── schema.ts       ← Schema Drizzle (10 tablas)
 │   │   ├── migrate.ts      ← Runner de migraciones
 │   │   └── seed.ts         ← Datos de ejemplo
 │   ├── plugins/
@@ -208,8 +208,10 @@ backend/                    ← @hotel/backend — Fastify API (PostgreSQL)
 ## Problemas conocidos
 
 - Frontend usa datos estáticos solo en la página de diseño (`/designs`); las 8 vistas usan la API real
-- Backend: auth JWT con refresh tokens (cookie de 7d), pero sin revocación server-side de refresh
-- Rate limiting solo en `/api/auth/login`, `/api/auth/register` y `/api/auth/refresh` (global 300/min); desactivado bajo `NODE_ENV=test`
+- Backend: auth JWT con refresh tokens en tabla `refresh_sessions` (rotación obligatoria; logout y cambio de contraseña revocan sesiones). Access token 15m, refresh 7d
+- Registro público cerrado por defecto (`ALLOW_REGISTRATION=false` en prod); el primer usuario (bootstrap) siempre puede registrarse
+- `TRUST_PROXY` desactivado por defecto: tras un proxy real hay que configurarlo o el rate-limit comparte la IP del proxy
+- Rate limiting solo en `/api/auth/login`, `/api/auth/register` y `/api/auth/refresh` (global 300/min) + lockout en memoria tras 5 fallos de login (15min); desactivado bajo `NODE_ENV=test`
 - Logging: pino con redacción de credenciales, sin correlación entre microservicios
 - Páginas legales (`/legal/*`) son plantillas redactadas sin revisión jurídica; validar con abogado antes de producción
 - `acceptTerms` y `acceptCancellationPolicy` se validan pero no se persisten: no hay registro de consentimiento

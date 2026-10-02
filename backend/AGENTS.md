@@ -28,18 +28,18 @@ pnpm test             # Vitest (fastify.inject contra BD hotel_manager_test)
 src/
 ├── app.ts              ← buildApp(): Fastify + CORS + plugins + rutas (exportado para Vercel)
 ├── index.ts            ← migrate on boot + listen (PORT 3001)
-├── api.test.ts         ← Tests de API (fastify.inject, 27 tests)
-├── config/env.ts       ← DATABASE_URL, JWT_SECRET, PORT, CORS_ORIGIN
+├── api.test.ts         ← Tests de API (fastify.inject, 33 tests)
+├── config/env.ts       ← DATABASE_URL, JWT_SECRET, PORT, CORS_ORIGIN, TRUST_PROXY, ALLOW_REGISTRATION
 ├── db/
 │   ├── index.ts        ← postgres client (pool max: 10) + drizzle instance
-│   ├── schema.ts       ← 9 tablas: users, rooms, guests, reservations, products, sales, invoices, expenses, settings
+│   ├── schema.ts       ← 10 tablas: users, rooms, guests, reservations, products, sales, invoices, expenses, settings, refresh_sessions
 │   ├── migrate.ts      ← drizzle-orm/postgres-js/migrator
 │   └── seed.ts         ← 20 rooms, 8 guests, 8 reservations, 14 products, 4 sales, 3 invoices, 12 expenses
 ├── plugins/
 │   ├── auth.ts         ← @fastify/jwt register + decorators authenticate/requireAdmin
 │   └── error-handler.ts ← AppError class + global error handler
 └── modules/
-    ├── auth/           ← register, login, me, profile (PATCH), password
+    ├── auth/           ← register (bootstrap/ALLOW_REGISTRATION), login (lockout), refresh (rotación), logout, me, profile (PATCH), password
     ├── rooms/          ← CRUD + PATCH status (admin only)
     ├── guests/         ← Búsqueda + CRUD
     ├── reservations/   ← CRUD + checkin/checkout/cancel (transactions)
@@ -236,8 +236,10 @@ Colección de 46 requests en `backend/bruno/` para testing de API:
 
 ## Problemas conocidos
 
-- Access token 15m + refresh token 7d (cookie HttpOnly), refresh sin revocación server-side
-- Rate limiting solo en `/api/auth/login`, `/api/auth/register` y `/api/auth/refresh` (global 300/min), desactivado bajo `NODE_ENV=test`
+- Access token 15m + refresh token 7d (cookies HttpOnly) con sesiones en `refresh_sessions`: rotación obligatoria, logout y cambio de contraseña revocan
+- Registro público cerrado salvo bootstrap del primer usuario o `ALLOW_REGISTRATION=true`
+- `TRUST_PROXY=false` por defecto; tras un proxy real configurarlo o el rate-limit comparte la IP del proxy
+- Rate limiting solo en `/api/auth/login`, `/api/auth/register` y `/api/auth/refresh` (global 300/min) + lockout en memoria tras 5 fallos (15min), desactivado bajo `NODE_ENV=test`
 - Logging estructurado con pino + redacción de credenciales, sin correlación entre microservicios
 - Seed hardcodea datos relativos a la fecha actual (no reproducible en tests)
 - `reports/financial` no retorna `occupancyRate` (solo `totalRevenue`)

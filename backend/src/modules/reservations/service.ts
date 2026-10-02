@@ -53,36 +53,49 @@ export async function checkRoomAvailability(roomId: string, checkIn: string, che
 }
 
 export async function createReservation(input: CreateReservationInput) {
-  const room = (await db.select().from(rooms).where(eq(rooms.id, input.roomId)).limit(1))[0]
-  if (!room) throw new AppError(404, 'Habitación no encontrada')
-
-  const guest = (await db.select().from(guests).where(eq(guests.id, input.guestId)).limit(1))[0]
-  if (!guest) throw new AppError(404, 'Huésped no encontrado')
-
   if (new Date(input.checkOut) <= new Date(input.checkIn)) {
     throw new AppError(400, 'La fecha de salida debe ser posterior a la de entrada')
   }
 
-  if (input.guests > room.maxCapacity) {
-    throw new AppError(400, `La habitación tiene capacidad máxima de ${room.maxCapacity} personas`)
-  }
+  return db.transaction(async (tx) => {
+    const room = (await tx.select().from(rooms).where(eq(rooms.id, input.roomId)).limit(1).for('update'))[0]
+    if (!room) throw new AppError(404, 'Habitación no encontrada')
 
-  await checkRoomAvailability(input.roomId, input.checkIn, input.checkOut)
+    const guest = (await tx.select().from(guests).where(eq(guests.id, input.guestId)).limit(1))[0]
+    if (!guest) throw new AppError(404, 'Huésped no encontrado')
 
-  const now = new Date().toISOString()
-  const id = randomUUID()
-  const totalAmount = computeTotalAmount(room.pricePerNight, input.checkIn, input.checkOut)
+    if (input.guests > room.maxCapacity) {
+      throw new AppError(400, `La habitación tiene capacidad máxima de ${room.maxCapacity} personas`)
+    }
 
-  await db.insert(reservations).values({
-    id,
-    ...input,
-    status: 'confirmada',
-    totalAmount,
-    createdAt: now,
-    updatedAt: now,
+    const overlapping = (await tx.select().from(reservations).where(and(
+      eq(reservations.roomId, input.roomId),
+      inArray(reservations.status, ['confirmada', 'checkin']),
+      lt(reservations.checkIn, input.checkOut),
+      gt(reservations.checkOut, input.checkIn),
+    )).limit(1))[0]
+
+    if (overlapping) {
+      throw new AppError(409, `La habitación ya tiene una reserva del ${overlapping.checkIn} al ${overlapping.checkOut}`)
+    }
+
+    const now = new Date().toISOString()
+    const id = randomUUID()
+    const totalAmount = computeTotalAmount(room.pricePerNight, input.checkIn, input.checkOut)
+    const advancePayment = Math.min(input.advancePayment ?? 0, totalAmount)
+
+    await tx.insert(reservations).values({
+      id,
+      ...input,
+      advancePayment,
+      status: 'confirmada',
+      totalAmount,
+      createdAt: now,
+      updatedAt: now,
+    })
+
+    return (await tx.select().from(reservations).where(eq(reservations.id, id)).limit(1))[0]
   })
-
-  return getReservationById(id)
 }
 
 export async function checkInReservation(id: string) {
@@ -133,17 +146,14 @@ export async function cancelReservation(id: string) {
     if (reservation.status === 'checkout' || reservation.status === 'cancelada') {
       throw new AppError(409, `No se puede cancelar una reserva con estado ${reservation.status}`)
     }
+    if (reservation.status === 'checkin') {
+      throw new AppError(400, 'No se puede cancelar una estancia alojada; realice el checkout primero')
+    }
 
     const now = new Date().toISOString()
     await tx.update(reservations)
       .set({ status: 'cancelada', updatedAt: now })
       .where(eq(reservations.id, id))
-
-    if (reservation.status === 'checkin') {
-      await tx.update(rooms)
-        .set({ status: 'libre', updatedAt: now })
-        .where(eq(rooms.id, reservation.roomId))
-    }
 
     const invoice = (await tx.select().from(invoices).where(eq(invoices.reservationId, reservation.id)).limit(1))[0]
     if (invoice && invoice.status === 'pendiente') {

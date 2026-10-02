@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, desc, eq, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, sql } from 'drizzle-orm'
 import type { Product as ProductType } from '@hotel/types'
 import { db } from '../../db/index.js'
 import { products, reservations, rooms, sales, invoices } from '../../db/schema.js'
@@ -70,6 +70,8 @@ export async function createSale(input: CreateSaleInput) {
     }
 
     let total = 0
+    const normalizedItems: { productId: string; quantity: number; unitPrice: number }[] = []
+
     for (const item of input.items) {
       const product = (await tx.select().from(products).where(eq(products.id, item.productId)).limit(1))[0]
       if (!product) {
@@ -78,24 +80,28 @@ export async function createSale(input: CreateSaleInput) {
       if (!product.active) {
         throw new AppError(409, `El producto ${product.name} esta desactivado y no se puede vender`)
       }
-      if (item.quantity > product.currentStock) {
+
+      const updated = await tx.update(products)
+        .set({ currentStock: sql`${products.currentStock} - ${item.quantity}` })
+        .where(and(eq(products.id, item.productId), gte(products.currentStock, item.quantity)))
+        .returning({ currentStock: products.currentStock })
+
+      if (updated.length === 0) {
         throw new AppError(409, `Stock insuficiente de ${product.name}: disponible ${product.currentStock}, pedido ${item.quantity}`)
       }
-      total += item.unitPrice * item.quantity
 
-      await tx.update(products)
-        .set({ currentStock: product.currentStock - item.quantity })
-        .where(eq(products.id, item.productId))
+      total += product.price * item.quantity
+      normalizedItems.push({ productId: item.productId, quantity: item.quantity, unitPrice: product.price })
     }
 
     const now = new Date()
     const id = randomUUID()
     const sale = {
       id,
-      items: input.items,
+      items: normalizedItems,
       total: Math.round(total * 100) / 100,
       paymentMethod: input.paymentMethod,
-      roomId: input.roomId ?? null,
+      roomId: input.paymentMethod === 'cargo_habitacion' ? (input.roomId ?? null) : null,
       date: now.toISOString().slice(0, 10),
       time: now.toTimeString().slice(0, 5),
       createdAt: now.toISOString(),

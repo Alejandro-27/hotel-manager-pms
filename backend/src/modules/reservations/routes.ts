@@ -1,17 +1,19 @@
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
-import type { ReservationStatus } from '@hotel/types'
 import {
   listReservations, getReservationById, createReservation,
   checkInReservation, checkOutReservation, cancelReservation,
 } from './service.js'
-import { createReservationSchema, reservationParamsSchema } from './schemas.js'
+import { createReservationSchema, reservationParamsSchema, listReservationsQuerySchema } from './schemas.js'
 
 export default async function reservationRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>()
 
-  typedApp.get('/api/reservations', { preHandler: [app.authenticate] }, async (req) => {
-    const { status, roomId, guestId } = req.query as { status?: ReservationStatus; roomId?: string; guestId?: string }
+  typedApp.get('/api/reservations', {
+    preHandler: [app.authenticate],
+    schema: { querystring: listReservationsQuerySchema },
+  }, async (req) => {
+    const { status, roomId, guestId } = req.query
     return listReservations({ status, roomId, guestId })
   })
 

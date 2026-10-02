@@ -21,4 +21,10 @@ export const reservationParamsSchema = z.object({
   id: z.string().min(1),
 })
 
+export const listReservationsQuerySchema = z.object({
+  status: z.enum(['confirmada', 'checkin', 'checkout', 'cancelada']).optional(),
+  roomId: z.string().optional(),
+  guestId: z.string().optional(),
+})
+
 export type CreateReservationInput = z.infer<typeof createReservationSchema>

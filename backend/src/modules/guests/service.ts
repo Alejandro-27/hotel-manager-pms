@@ -7,7 +7,8 @@ import type { CreateGuestInput, UpdateGuestInput } from './schemas.js'
 
 export async function listGuests(search?: string) {
   if (search) {
-    const pattern = `%${search}%`
+    const escaped = search.replace(/[\\%_]/g, (ch) => `\\${ch}`)
+    const pattern = `%${escaped}%`
     return db.select()
       .from(guests)
       .where(or(

@@ -108,18 +108,29 @@ export async function getInvoiceById(id: string) {
 }
 
 export async function payInvoice(id: string, input: PayInvoiceInput) {
-  const invoice = await getInvoiceById(id)
-  if (invoice.status === 'pagada') {
-    throw new AppError(409, 'La factura ya está pagada')
-  }
+  return db.transaction(async (tx) => {
+    const invoice = (await tx
+      .select()
+      .from(invoices)
+      .where(eq(invoices.id, id))
+      .limit(1)
+      .for('update'))[0]
+    if (!invoice) throw new AppError(404, 'Factura no encontrada')
+    if (invoice.status === 'pagada') {
+      throw new AppError(409, 'La factura ya está pagada')
+    }
+    if (input.amount > invoice.totalDue) {
+      throw new AppError(400, 'El importe supera el saldo pendiente')
+    }
 
-  const newPaid = Math.round((invoice.advancePayment + input.amount) * 100) / 100
-  const newTotalDue = Math.round((invoice.totalDue - input.amount) * 100) / 100
-  const status = newTotalDue <= 0 ? 'pagada' : 'parcial'
+    const newPaid = Math.round((invoice.advancePayment + input.amount) * 100) / 100
+    const newTotalDue = Math.round((invoice.totalDue - input.amount) * 100) / 100
+    const status = newTotalDue <= 0 ? 'pagada' : 'parcial'
 
-  await db.update(invoices)
-    .set({ advancePayment: newPaid, totalDue: Math.max(newTotalDue, 0), status })
-    .where(eq(invoices.id, id))
+    await tx.update(invoices)
+      .set({ advancePayment: newPaid, totalDue: Math.max(newTotalDue, 0), status })
+      .where(eq(invoices.id, id))
 
-  return getInvoiceById(id)
+    return (await tx.select().from(invoices).where(eq(invoices.id, id)).limit(1))[0]
+  })
 }

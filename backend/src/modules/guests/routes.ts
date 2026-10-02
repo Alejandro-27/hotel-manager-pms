@@ -1,14 +1,16 @@
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { listGuests, getGuestById, createGuest, updateGuest } from './service.js'
-import { createGuestSchema, updateGuestSchema, guestParamsSchema } from './schemas.js'
+import { createGuestSchema, updateGuestSchema, guestParamsSchema, listGuestsQuerySchema } from './schemas.js'
 
 export default async function guestRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>()
 
-  typedApp.get('/api/guests', { preHandler: [app.authenticate] }, async (req) => {
-    const { q } = req.query as { q?: string }
-    return listGuests(q)
+  typedApp.get('/api/guests', {
+    preHandler: [app.authenticate],
+    schema: { querystring: listGuestsQuerySchema },
+  }, async (req) => {
+    return listGuests(req.query.q)
   })
 
   typedApp.get('/api/guests/:id', {

@@ -1,19 +1,17 @@
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
-import type { RoomStatus } from '@hotel/types'
 import { listRooms, getRoomById, createRoom, updateRoom, updateRoomStatus } from './service.js'
-import { createRoomSchema, updateRoomSchema, updateRoomStatusSchema, roomParamsSchema } from './schemas.js'
+import { createRoomSchema, updateRoomSchema, updateRoomStatusSchema, roomParamsSchema, listRoomsQuerySchema } from './schemas.js'
 
 export default async function roomRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>()
 
-  typedApp.get('/api/rooms', { preHandler: [app.authenticate] }, async (req) => {
-    const { status, type, floor } = req.query as { status?: RoomStatus; type?: 'individual' | 'doble' | 'suite' | 'familiar'; floor?: string }
-    return listRooms({
-      status,
-      type,
-      floor: floor !== undefined ? Number(floor) : undefined,
-    })
+  typedApp.get('/api/rooms', {
+    preHandler: [app.authenticate],
+    schema: { querystring: listRoomsQuerySchema },
+  }, async (req) => {
+    const { status, type, floor } = req.query
+    return listRooms({ status, type, floor })
   })
 
   typedApp.get('/api/rooms/:id', {

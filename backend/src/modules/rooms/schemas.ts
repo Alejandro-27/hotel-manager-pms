@@ -27,6 +27,12 @@ export const roomParamsSchema = z.object({
   id: z.string().min(1),
 })
 
+export const listRoomsQuerySchema = z.object({
+  status: z.enum(roomStatusValues).optional(),
+  type: z.enum(['individual', 'doble', 'suite', 'familiar']).optional(),
+  floor: z.coerce.number().int().min(0).optional(),
+})
+
 export type CreateRoomInput = z.infer<typeof createRoomSchema>
 export type UpdateRoomInput = z.infer<typeof updateRoomSchema>
 export type UpdateRoomStatusInput = z.infer<typeof updateRoomStatusSchema>

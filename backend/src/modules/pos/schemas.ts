@@ -43,3 +43,11 @@ export type CreateProductInput = z.infer<typeof createProductSchema>
 export type UpdateProductInput = z.infer<typeof updateProductSchema>
 export type UpdateStockInput = z.infer<typeof updateStockSchema>
 export type CreateSaleInput = z.infer<typeof createSaleSchema>
+
+export const listProductsQuerySchema = z.object({
+  category: z.enum(['desayunos', 'snacks', 'bebidas']).optional(),
+})
+
+export const listSalesQuerySchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida (YYYY-MM-DD)').optional(),
+})

@@ -1,14 +1,16 @@
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
-import type { InvoiceStatus } from '@hotel/types'
 import { listInvoices, getInvoiceById, payInvoice } from './service.js'
-import { payInvoiceSchema, invoiceParamsSchema } from './schemas.js'
+import { payInvoiceSchema, invoiceParamsSchema, listInvoicesQuerySchema } from './schemas.js'
 
 export default async function billingRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>()
 
-  typedApp.get('/api/invoices', { preHandler: [app.authenticate] }, async (req) => {
-    const { status, guestId } = req.query as { status?: InvoiceStatus; guestId?: string }
+  typedApp.get('/api/invoices', {
+    preHandler: [app.authenticate],
+    schema: { querystring: listInvoicesQuerySchema },
+  }, async (req) => {
+    const { status, guestId } = req.query
     return listInvoices({ status, guestId })
   })
 

@@ -18,5 +18,9 @@ export const guestParamsSchema = z.object({
   id: z.string().min(1),
 })
 
+export const listGuestsQuerySchema = z.object({
+  q: z.string().max(120).optional(),
+})
+
 export type CreateGuestInput = z.infer<typeof createGuestSchema>
 export type UpdateGuestInput = z.infer<typeof updateGuestSchema>

@@ -1,15 +1,16 @@
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
-import type { Product } from '@hotel/types'
 import { listProducts, createProduct, updateProduct, deleteProduct, updateStock, createSale, listSales } from './service.js'
-import { createProductSchema, updateProductSchema, updateStockSchema, createSaleSchema, productParamsSchema } from './schemas.js'
+import { createProductSchema, updateProductSchema, updateStockSchema, createSaleSchema, productParamsSchema, listProductsQuerySchema, listSalesQuerySchema } from './schemas.js'
 
 export default async function posRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>()
 
-  typedApp.get('/api/products', { preHandler: [app.authenticate] }, async (req) => {
-    const { category } = req.query as { category?: Product['category'] }
-    return listProducts(category)
+  typedApp.get('/api/products', {
+    preHandler: [app.authenticate],
+    schema: { querystring: listProductsQuerySchema },
+  }, async (req) => {
+    return listProducts(req.query.category)
   })
 
   typedApp.post('/api/products', {
@@ -50,8 +51,10 @@ export default async function posRoutes(app: FastifyInstance) {
     reply.code(201).send(sale)
   })
 
-  typedApp.get('/api/sales', { preHandler: [app.authenticate] }, async (req) => {
-    const { date } = req.query as { date?: string }
-    return listSales(date)
+  typedApp.get('/api/sales', {
+    preHandler: [app.authenticate],
+    schema: { querystring: listSalesQuerySchema },
+  }, async (req) => {
+    return listSales(req.query.date)
   })
 }

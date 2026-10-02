@@ -12,6 +12,9 @@ post {
 
 script:post-response {
   if (res.status === 200) {
-    bru.setVar("token", res.body.token)
+    const raw = res.headers["set-cookie"]
+    const list = Array.isArray(raw) ? raw : (raw ? [raw] : [])
+    const cookie = list.map((c) => c.split(";")[0]).find((c) => c.startsWith("token="))
+    if (cookie) bru.setVar("token", cookie.slice("token=".length))
   }
 }

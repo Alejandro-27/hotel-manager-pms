@@ -21,7 +21,7 @@ export default async function globalSetup() {
   const db = drizzle(client, { schema })
   await migrate(db, { migrationsFolder: './drizzle' })
 
-  await db.execute(`TRUNCATE users, rooms, guests, reservations, products, sales, invoices, expenses, settings RESTART IDENTITY CASCADE`)
+  await db.execute(`TRUNCATE users, rooms, guests, reservations, products, sales, invoices, expenses, settings, refresh_sessions RESTART IDENTITY CASCADE`)
 
   const adminHash = await bcrypt.hash('Password123!', 10)
   const now = new Date().toISOString()

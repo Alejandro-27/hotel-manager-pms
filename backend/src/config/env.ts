@@ -15,6 +15,22 @@ if (nodeEnv === 'production') {
   }
 }
 
+function ttlToSeconds(ttl: string): number {
+  const match = /^(\d+)\s*([smhd])?$/.exec(ttl.trim())
+  if (!match) return 900
+  const value = Number(match[1])
+  const unit = match[2] ?? 's'
+  const multiplier = unit === 's' ? 1 : unit === 'm' ? 60 : unit === 'h' ? 3600 : 86400
+  return value * multiplier
+}
+
+function parseTrustProxy(value: string | undefined): boolean | string[] {
+  if (!value) return false
+  if (value === 'true') return true
+  if (value === 'false') return false
+  return value.split(',').map((entry) => entry.trim()).filter(Boolean)
+}
+
 export const env = {
   nodeEnv,
   port: Number(process.env.PORT ?? 3001),
@@ -23,4 +39,14 @@ export const env = {
   jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
   databaseUrl,
   corsOrigin: (process.env.CORS_ORIGIN ?? 'http://localhost:3000').split(',').map(s => s.trim()).filter(Boolean),
+  trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
+}
+
+export const jwtAccessTtlSeconds = ttlToSeconds(env.jwtExpiresIn)
+export const jwtRefreshTtlSeconds = ttlToSeconds(env.jwtRefreshExpiresIn)
+
+export function isRegistrationAllowed(): boolean {
+  const flag = process.env.ALLOW_REGISTRATION
+  if (flag !== undefined) return flag === 'true' || flag === '1'
+  return nodeEnv !== 'production'
 }

@@ -20,7 +20,7 @@ async function registerUser(email: string, name = 'Usuario Test'): Promise<strin
     payload: { name, email, password: 'Password123!', acceptTerms: true },
   })
   expect(res.statusCode).toBe(201)
-  return (res.json() as { token: string }).token
+  return res.cookies.find((cookie) => cookie.name === 'token')?.value ?? ''
 }
 
 async function loginAsAdmin(): Promise<string> {
@@ -30,7 +30,7 @@ async function loginAsAdmin(): Promise<string> {
     payload: { email: 'admin@test.com', password: 'Password123!' },
   })
   expect(res.statusCode).toBe(200)
-  return (res.json() as { token: string }).token
+  return res.cookies.find((cookie) => cookie.name === 'token')?.value ?? ''
 }
 
 describe('health', () => {
@@ -63,6 +63,100 @@ describe('autenticacion', () => {
       payload: { email: 'nadie@test.com', password: 'malapassword' },
     })
     expect(res.statusCode).toBe(401)
+  })
+
+  it('no acepta un refresh token como access token', async () => {
+    const login = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email: 'admin@test.com', password: 'Password123!' },
+    })
+    const refreshToken = login.cookies.find((cookie) => cookie.name === 'refreshToken')?.value ?? ''
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/rooms',
+      headers: { authorization: `Bearer ${refreshToken}` },
+    })
+    expect(res.statusCode).toBe(401)
+  })
+
+  it('rota el refresh token e invalida el anterior', async () => {
+    const login = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email: 'admin@test.com', password: 'Password123!' },
+    })
+    const refreshToken = login.cookies.find((cookie) => cookie.name === 'refreshToken')?.value ?? ''
+
+    const first = await app.inject({
+      method: 'POST',
+      url: '/api/auth/refresh',
+      cookies: { refreshToken },
+    })
+    expect(first.statusCode).toBe(200)
+
+    const reused = await app.inject({
+      method: 'POST',
+      url: '/api/auth/refresh',
+      cookies: { refreshToken },
+    })
+    expect(reused.statusCode).toBe(401)
+  })
+
+  it('bloquea el login tras varios intentos fallidos', async () => {
+    const email = `bruteforce-${Date.now()}@test.com`
+    for (let i = 0; i < 5; i++) {
+      await app.inject({
+        method: 'POST',
+        url: '/api/auth/login',
+        payload: { email, password: 'mala' },
+      })
+    }
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email, password: 'mala' },
+    })
+    expect(res.statusCode).toBe(429)
+  })
+
+  it('el cambio de contrasena revoca las sesiones activas', async () => {
+    const email = `revoke-${Date.now()}@test.com`
+    await registerUser(email)
+
+    const login = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email, password: 'Password123!' },
+    })
+    const accessToken = login.cookies.find((cookie) => cookie.name === 'token')?.value ?? ''
+    const refreshToken = login.cookies.find((cookie) => cookie.name === 'refreshToken')?.value ?? ''
+
+    const change = await app.inject({
+      method: 'POST',
+      url: '/api/auth/password',
+      headers: { authorization: `Bearer ${accessToken}` },
+      payload: { currentPassword: 'Password123!', newPassword: 'NuevaPass123!' },
+    })
+    expect(change.statusCode).toBe(200)
+
+    const refreshed = await app.inject({
+      method: 'POST',
+      url: '/api/auth/refresh',
+      cookies: { refreshToken },
+    })
+    expect(refreshed.statusCode).toBe(401)
+  })
+
+  it('rechaza peticiones de estado con origin no permitido', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      headers: { origin: 'https://evil.example.com' },
+      payload: { email: 'x@x.com', password: 'x' },
+    })
+    expect(res.statusCode).toBe(403)
   })
 
   it('expone el perfil del usuario autenticado', async () => {
@@ -217,11 +311,16 @@ describe('expenses', () => {
 
   it('el informe financiero refleja los gastos del mes', async () => {
     const adminToken = await loginAsAdmin()
+    const today = new Date()
+    const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+    const currentMonthLabel = monthNames[today.getMonth()]
+    const expenseDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-05`
+
     await app.inject({
       method: 'POST',
       url: '/api/expenses',
       headers: { authorization: `Bearer ${adminToken}` },
-      payload: { category: 'nominas', amount: 3000, date: '2026-09-05', note: 'Nomina' },
+      payload: { category: 'nominas', amount: 3000, date: expenseDate, note: 'Nomina' },
     })
 
     const res = await app.inject({
@@ -231,8 +330,8 @@ describe('expenses', () => {
     })
     expect(res.statusCode).toBe(200)
     const report = res.json() as { monthlyRevenue: { month: string; gastos: number }[] }
-    const september = report.monthlyRevenue.find((m) => m.month === 'Sep')
-    expect(september?.gastos).toBe(3000)
+    const current = report.monthlyRevenue.find((m) => m.month === currentMonthLabel)
+    expect(current?.gastos).toBe(3000)
   })
 
   it('valida el parametro months', async () => {
@@ -697,7 +796,7 @@ describe('factura en curso por cargo a habitacion', () => {
     expect(invoices[0].status).toBe('pendiente')
   })
 
-  it('cancelar una reserva con factura pendiente elimina la factura', async () => {
+  it('no permite cancelar una reserva con check-in hecho', async () => {
     const stay = await createStay()
 
     await app.inject({
@@ -723,14 +822,44 @@ describe('factura en curso por cargo a habitacion', () => {
       url: `/api/reservations/${stay.reservationId}/cancel`,
       headers: { authorization: `Bearer ${stay.token}` },
     })
-    expect(cancel.statusCode).toBe(200)
+    expect(cancel.statusCode).toBe(400)
 
     const after = await app.inject({
       method: 'GET',
       url: `/api/invoices?guestId=${stay.guestId}`,
       headers: { authorization: `Bearer ${stay.token}` },
     })
-    expect((after.json() as unknown[])).toHaveLength(0)
+    expect((after.json() as unknown[])).toHaveLength(1)
+  })
+
+  it('rechaza un pago mayor al saldo pendiente', async () => {
+    const stay = await createStay()
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/sales',
+      headers: { authorization: `Bearer ${stay.token}` },
+      payload: {
+        items: [{ productId: stay.productId, quantity: 2, unitPrice: 5 }],
+        paymentMethod: 'cargo_habitacion',
+        roomId: stay.roomId,
+      },
+    })
+
+    const list = await app.inject({
+      method: 'GET',
+      url: `/api/invoices?guestId=${stay.guestId}`,
+      headers: { authorization: `Bearer ${stay.token}` },
+    })
+    const invoice = (list.json() as { id: string; totalDue: number }[])[0]
+
+    const pay = await app.inject({
+      method: 'POST',
+      url: `/api/invoices/${invoice.id}/pay`,
+      headers: { authorization: `Bearer ${stay.token}` },
+      payload: { amount: invoice.totalDue + 100 },
+    })
+    expect(pay.statusCode).toBe(400)
   })
 })
 

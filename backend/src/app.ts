@@ -21,7 +21,7 @@ const normalizeOrigin = (value?: string) => value?.replace(/\/+$/, '') ?? value
 
 export function buildApp() {
   const app = Fastify({
-    trustProxy: env.nodeEnv === 'production',
+    trustProxy: env.trustProxy,
     logger: {
       level: env.nodeEnv === 'production' ? 'info' : 'debug',
       redact: {
@@ -42,6 +42,10 @@ export function buildApp() {
   app.setValidatorCompiler(validatorCompiler)
   app.setSerializerCompiler(serializerCompiler)
 
+  const allowedOrigins = new Set(
+    env.corsOrigin.map((origin) => normalizeOrigin(origin) ?? '')
+  )
+
   if (env.nodeEnv === 'production') {
     app.addHook('onRequest', async (req, reply) => {
       if (req.headers['x-forwarded-proto'] === 'http') {
@@ -50,9 +54,18 @@ export function buildApp() {
     })
   }
 
-  const allowedOrigins = new Set(
-    env.corsOrigin.map((origin) => normalizeOrigin(origin) ?? '')
-  )
+  app.addHook('onRequest', async (req, reply) => {
+    const origin = normalizeOrigin(req.headers.origin)
+    const isStateChanging = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)
+
+    if (isStateChanging && origin && !allowedOrigins.has(origin)) {
+      return reply.code(403).send({ error: 'Origen no permitido' })
+    }
+
+    if (req.url.startsWith('/api/auth')) {
+      reply.header('Cache-Control', 'no-store')
+    }
+  })
 
   app.register(cors, {
     origin: (origin, cb) => {

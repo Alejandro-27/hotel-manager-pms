@@ -29,6 +29,13 @@
       "when": 1790799297870,
       "tag": "0003_thick_spiral",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790960962306,
+      "tag": "0004_eager_juggernaut",
+      "breakpoints": true
     }
   ]
 }

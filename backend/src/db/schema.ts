@@ -96,6 +96,14 @@ export const expenses = pgTable('expenses', {
   createdAt: text('created_at').notNull(),
 })
 
+export const refreshSessions = pgTable('refresh_sessions', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  createdAt: text('created_at').notNull(),
+  expiresAt: text('expires_at').notNull(),
+  revokedAt: text('revoked_at'),
+})
+
 export const settings = pgTable('settings', {
   id: text('id').primaryKey().default('main'),
   legalName: text('legal_name').notNull().default(''),
@@ -125,3 +133,5 @@ export type Expense = typeof expenses.$inferSelect
 export type NewExpense = typeof expenses.$inferInsert
 export type Settings = typeof settings.$inferSelect
 export type NewSettings = typeof settings.$inferInsert
+export type RefreshSession = typeof refreshSessions.$inferSelect
+export type NewRefreshSession = typeof refreshSessions.$inferInsert

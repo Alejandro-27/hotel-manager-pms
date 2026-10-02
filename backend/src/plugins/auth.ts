@@ -39,7 +39,11 @@ export default fp(async (app) => {
         return
       }
 
-      const payload = await app.jwt.verify<AuthUser>(token)
+      const payload = await app.jwt.verify<AuthUser & { type?: string }>(token)
+      if (payload.type === 'refresh') {
+        reply.code(401).send({ error: 'No autorizado' })
+        return
+      }
       req.authUser = {
         sub: payload.sub,
         email: payload.email,

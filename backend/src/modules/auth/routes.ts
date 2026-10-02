@@ -1,16 +1,27 @@
+import { randomUUID } from 'node:crypto'
 import type { FastifyInstance, FastifyReply } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
-import { register, login, buildAuthUser, getMe, updateProfile, changePassword } from './service.js'
+import {
+  register,
+  login,
+  buildAuthUser,
+  getMe,
+  updateProfile,
+  changePassword,
+  createRefreshSession,
+  rotateRefreshSession,
+  revokeRefreshSession,
+} from './service.js'
 import { registerSchema, loginSchema, updateProfileSchema, changePasswordSchema } from './schemas.js'
 import type { AuthUser } from '../../plugins/auth.js'
-import { env } from '../../config/env.js'
+import { env, jwtAccessTtlSeconds, jwtRefreshTtlSeconds } from '../../config/env.js'
 
 const accessCookie = {
   httpOnly: true,
   sameSite: 'lax' as const,
   secure: env.nodeEnv === 'production',
   path: '/',
-  maxAge: 7 * 24 * 60 * 60,
+  maxAge: jwtAccessTtlSeconds,
 }
 
 const refreshCookie = {
@@ -18,21 +29,22 @@ const refreshCookie = {
   sameSite: 'lax' as const,
   secure: env.nodeEnv === 'production',
   path: '/api/auth',
-  maxAge: 7 * 24 * 60 * 60,
+  maxAge: jwtRefreshTtlSeconds,
 }
 
 export default async function authRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>()
 
-  function setAuthCookies(reply: FastifyReply, user: { id: string; name: string; email: string; role: string }) {
-    const token = app.jwt.sign(buildAuthUser(user))
+  async function issueSession(reply: FastifyReply, user: { id: string; name: string; email: string; role: string }) {
+    const token = app.jwt.sign({ ...buildAuthUser(user), type: 'access' })
+    const jti = randomUUID()
     const refreshToken = app.jwt.sign(
-      { ...buildAuthUser(user), type: 'refresh' },
+      { ...buildAuthUser(user), type: 'refresh', jti },
       { expiresIn: env.jwtRefreshExpiresIn }
     )
+    await createRefreshSession(jti, user.id, new Date(Date.now() + jwtRefreshTtlSeconds * 1000).toISOString())
     reply.setCookie('token', token, accessCookie)
     reply.setCookie('refreshToken', refreshToken, refreshCookie)
-    return token
   }
 
   typedApp.post('/api/auth/register', {
@@ -40,8 +52,8 @@ export default async function authRoutes(app: FastifyInstance) {
     schema: { body: registerSchema },
   }, async (req, reply) => {
     const user = await register(req.body)
-    const token = setAuthCookies(reply, user)
-    reply.code(201).send({ user, token })
+    await issueSession(reply, user)
+    reply.code(201).send({ user })
   })
 
   typedApp.post('/api/auth/login', {
@@ -49,8 +61,8 @@ export default async function authRoutes(app: FastifyInstance) {
     schema: { body: loginSchema },
   }, async (req, reply) => {
     const user = await login(req.body)
-    const token = setAuthCookies(reply, user)
-    reply.send({ user, token })
+    await issueSession(reply, user)
+    reply.send({ user })
   })
 
   typedApp.post('/api/auth/refresh', {
@@ -61,24 +73,39 @@ export default async function authRoutes(app: FastifyInstance) {
       reply.code(401).send({ error: 'Sesión expirada' })
       return
     }
-    let payload: AuthUser & { type?: string }
+    let payload: AuthUser & { type?: string; jti?: string }
     try {
-      payload = await app.jwt.verify<AuthUser & { type?: string }>(token)
+      payload = await app.jwt.verify<AuthUser & { type?: string; jti?: string }>(token)
     } catch {
       reply.code(401).send({ error: 'Sesión expirada' })
       return
     }
-    if (payload.type !== 'refresh') {
+    if (payload.type !== 'refresh' || !payload.jti) {
+      reply.code(401).send({ error: 'Sesión expirada' })
+      return
+    }
+
+    const rotated = await rotateRefreshSession(payload.jti, payload.sub)
+    if (!rotated) {
       reply.code(401).send({ error: 'Sesión expirada' })
       return
     }
 
     const user = await getMe(payload.sub)
-    const newToken = setAuthCookies(reply, user)
-    reply.send({ user, token: newToken })
+    await issueSession(reply, user)
+    reply.send({ user })
   })
 
-  typedApp.post('/api/auth/logout', async (_req, reply) => {
+  typedApp.post('/api/auth/logout', async (req, reply) => {
+    const token = req.cookies?.refreshToken
+    if (token) {
+      try {
+        const payload = await app.jwt.verify<AuthUser & { jti?: string }>(token)
+        if (payload.jti) await revokeRefreshSession(payload.jti)
+      } catch {
+        // cookie inválida o expirada: solo se limpian las cookies
+      }
+    }
     reply.clearCookie('token', { path: '/' })
     reply.clearCookie('refreshToken', { path: '/api/auth' })
     reply.send({ ok: true })

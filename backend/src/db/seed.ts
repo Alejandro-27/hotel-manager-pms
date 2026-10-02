@@ -174,6 +174,11 @@ async function seed() {
   console.log('  - 2 users (admin@hotel.com / Admin123!)')
 }
 
+if (process.env.NODE_ENV === 'production') {
+  console.error('El seed está deshabilitado en producción')
+  process.exit(1)
+}
+
 seed().catch((err) => {
   console.error(err)
   process.exit(1)

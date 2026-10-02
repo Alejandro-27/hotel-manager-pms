@@ -366,6 +366,7 @@ export function BookingWizard({
                 <Link
                   href="/legal/reembolsos"
                   target="_blank"
+                  rel="noopener noreferrer"
                   className="mt-1 inline-block text-xs font-medium text-amber-800 underline"
                 >
                   Ver condiciones completas
@@ -384,6 +385,7 @@ export function BookingWizard({
                 <Link
                   href="/legal/reembolsos"
                   target="_blank"
+                  rel="noopener noreferrer"
                   className="font-medium text-primary underline"
                 >
                   politica de cancelacion y reembolsos

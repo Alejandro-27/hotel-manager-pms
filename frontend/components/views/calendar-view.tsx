@@ -418,7 +418,7 @@ export function CalendarView() {
               />
               <span className="text-foreground">
                 El huesped acepta la{" "}
-                <Link href="/legal/reembolsos" target="_blank" className="font-medium text-primary underline">
+                <Link href="/legal/reembolsos" target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline">
                   politica de cancelacion
                 </Link>
               </span>

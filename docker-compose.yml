@@ -7,8 +7,33 @@ services:
       POSTGRES_USER: hotel
       POSTGRES_PASSWORD: hotel123
       POSTGRES_DB: hotel_manager
+    # Postgres de desarrollo acotado para no comerse RAM/CPU/disco del host.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=64MB
+      - -c
+      - max_connections=30
+      - -c
+      - work_mem=2MB
+      - -c
+      - maintenance_work_mem=32MB
+      - -c
+      - effective_cache_size=128MB
+      - -c
+      - max_wal_size=256MB
+      - -c
+      - min_wal_size=64MB
     ports:
-      - '5432:5432'
+      - '127.0.0.1:5432:5432'
+    mem_limit: 256m
+    cpus: 1.0
+    pids_limit: 256
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '2'
     volumes:
       - hotel-pg-data:/var/lib/postgresql/data
 

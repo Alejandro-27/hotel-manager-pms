@@ -126,8 +126,8 @@ await db.delete(rooms).where(eq(rooms.id, id))
 
 ## Auth
 
-- **Login**: `POST /api/auth/login` → retorna `{ user, token }`
-- **Register**: `POST /api/auth/register` → primer usuario es admin, resto recepcion
+- **Login**: `POST /api/auth/login` → setea cookies `token`/`refreshToken` y retorna `{ user }`
+- **Register**: `POST /api/auth/register` → bootstrap del primer usuario (admin); el resto solo con `ALLOW_REGISTRATION=true`
 - **Me**: `GET /api/auth/me` → requiere `Authorization: Bearer <token>`
 - **Roles**: `admin` (write rooms/status), `recepcion` (lectura + guest CRUD + reservations)
 - **Decorators**: `app.authenticate` (requiere token), `app.requireAdmin` (requiere rol admin)
@@ -137,8 +137,8 @@ await db.delete(rooms).where(eq(rooms.id, id))
 | Método | Endpoint | Auth | Descripción |
 |--------|----------|------|-------------|
 | GET | /health | No | Health check |
-| POST | /api/auth/register | No | Registro (primero = admin) |
-| POST | /api/auth/login | No | Login → token JWT + cookies (access + refresh) |
+| POST | /api/auth/register | No | Registro (bootstrap/ALLOW_REGISTRATION; primero = admin) |
+| POST | /api/auth/login | No | Login → cookies access + refresh y `{ user }` |
 | POST | /api/auth/refresh | No | Renueva access token vía cookie refresh (7d) |
 | POST | /api/auth/logout | No | Limpia cookies de sesión |
 | GET | /api/auth/me | Sí | Datos del usuario actual |
@@ -184,7 +184,7 @@ await db.delete(rooms).where(eq(rooms.id, id))
 - **Pooling**: max 10 conexiones
 - **Migraciones**: `drizzle-kit generate` genera SQL, auto-apply en server start
 - **Seed**: idempotente (skip si users existen), cierra conexión al terminar
-- **Tablas**: users, rooms, guests, reservations, products, sales, invoices, expenses, settings
+- **Tablas**: users, rooms, guests, reservations, products, sales, invoices, expenses, settings, refresh_sessions
 - **Foreign keys**: reservations→guests+rooms, sales→rooms, invoices→reservations+guests, expenses→users (createdBy)
 
 ## Testing (Vitest)
@@ -207,9 +207,14 @@ services:
       POSTGRES_USER: hotel
       POSTGRES_PASSWORD: hotel123
       POSTGRES_DB: hotel_manager
-    ports: ['5432:5432']
+    command: [postgres, -c, shared_buffers=64MB, -c, max_connections=30, ...]
+    ports: ['127.0.0.1:5432:5432']   # solo localhost
+    mem_limit: 256m                   # tope de RAM
+    cpus: 1.0
     volumes: [hotel-pg-data:/var/lib/postgresql/data]
 ```
+
+Solo se levanta Postgres (`docker compose up -d db`). No hay otros servicios locales.
 
 ## Bruno Collection
 

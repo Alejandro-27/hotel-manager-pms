@@ -80,4 +80,4 @@ Servidor en `http://localhost:3001`. Login: `admin@hotel.com` / `Admin123!` (adm
 - Frontend completo conectado a la API real (auth JWT, sin datos mock excepto `/designs`)
 - Backend completo: auth JWT con refresh, habitaciones, huéspedes, reservas (checkin/checkout/cancel), POS, facturación, gastos, datos legales del negocio e informes sobre PostgreSQL (Drizzle), con migraciones, seed y tests
 - Páginas legales en `/legal/privacidad`, `/legal/terminos` y `/legal/reembolsos` (**plantillas sin revisión jurídica**)
-- Consentimientos (`acceptTerms`, `acceptCancellationPolicy`) obligatorios en registro y reservas; se validan pero no se persisten
+- Consentimientos (`acceptTerms`, `acceptCancellationPolicy`) obligatorios en registro y reservas; se persisten con fecha de aceptación

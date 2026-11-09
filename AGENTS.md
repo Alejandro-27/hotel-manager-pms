@@ -37,7 +37,7 @@ pnpm dev:api                                  # Backend en http://localhost:3001
 | `pnpm build` | Build frontend |
 | `pnpm build:api` | Build backend (tsc → `dist/`) |
 | `pnpm lint` | ESLint frontend |
-| `pnpm test` | Vitest frontend (54 tests) |
+| `pnpm test` | Vitest frontend (61 tests) |
 | `pnpm test:api` | Vitest backend (33 tests, requiere PostgreSQL) |
 | `docker compose up -d` | Levantar PostgreSQL |
 | `pnpm --filter @hotel/backend db:migrate` | Aplicar migraciones |
@@ -214,7 +214,7 @@ backend/                    ← @hotel/backend — Fastify API (PostgreSQL)
 - Rate limiting solo en `/api/auth/login`, `/api/auth/register` y `/api/auth/refresh` (global 300/min) + lockout en memoria tras 5 fallos de login (15min); desactivado bajo `NODE_ENV=test`
 - Logging: pino con redacción de credenciales, sin correlación entre microservicios
 - Páginas legales (`/legal/*`) son plantillas redactadas sin revisión jurídica; validar con abogado antes de producción
-- `acceptTerms` y `acceptCancellationPolicy` se validan pero no se persisten: no hay registro de consentimiento
+- `acceptTerms` y `acceptCancellationPolicy` se persisten con fecha (`users.terms_accepted_at`, `reservations.cancellation_policy_accepted_at`); los usuarios/reservas anteriores a la migración `0005` quedan con `NULL`
 - Sin verificación visual automatizada (browser bridge roto); revisar light/dark, foco y responsive a mano en `pnpm dev`
 
 ## CI/CD

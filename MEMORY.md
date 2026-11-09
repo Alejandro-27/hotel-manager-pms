@@ -14,9 +14,9 @@ Documento de **estado dinámico** del proyecto. Complementa a `AGENTS.md` (conve
 
 ## Snapshot actual
 
-- Fecha: 2026-10-02 · Rama: `main` · Último commit: `fd8888e` (validacion numerica en inputs)
-- **Pendiente de commit**: parches de seguridad (sesiones refresh + lockout + CSRF Origin + integridad financiera), gating de registro, deps actualizadas y overrides de auditoría.
-- Código fuente: `tsc` limpio en frontend y backend; lint frontend 0 errores / 6 warnings (baseline); `pnpm test` **54/54**; `pnpm test:api` **33/33**; `pnpm build` OK (Next 16.3.8).
+- Fecha: 2026-10-02 · Rama: `main` · Último commit: `97723b5` (docs: conteos y estado de seguridad)
+- **Pendiente de commit**: consentimientos persistidos (migración `0005`) y optimización de Docker (límites de Postgres).
+- Código fuente: `tsc` limpio en frontend y backend; lint frontend 0 errores / 6 warnings (baseline); `pnpm test` **61/61**; `pnpm test:api` **33/33**; `pnpm build` OK (Next 16.3.8).
 - **Auditoría de dependencias**: `pnpm audit --prod` → 0 vulnerabilidades. En dev queda 1 moderada (`esbuild@0.18.20` vía `drizzle-kit`/`@esbuild-kit`; solo afecta al dev-server de esbuild, no se usa así). Resuelto con `overrides` en `pnpm-workspace.yaml` (pnpm v12 ya no lee `pnpm.overrides` de `package.json`).
 - Revertidos los cambios **visuales** de la auditoría de 7 fases a petición del usuario: la estética previa queda intacta. Se conserva la funcionalidad (legal, settings, consentimientos) y atributos sin impacto (`aria-*`, foco).
 - Browser bridge roto → verificación visual manual en `pnpm dev` (pendiente comprobar la CSP de producción, que solo aplica con `next build && next start`).
@@ -25,7 +25,7 @@ Documento de **estado dinámico** del proyecto. Complementa a `AGENTS.md` (conve
 
 | Recurso | Conteo | Fuente |
 |---|---|---|
-| Frontend | 54 tests | `pnpm test` |
+| Frontend | 61 tests | `pnpm test` |
 | Backend | 33 tests | `pnpm test:api` (verificado 2026-10-02, 33/33) |
 | Bruno | 46 requests | `backend/bruno/` |
 
@@ -38,7 +38,7 @@ Documento de **estado dinámico** del proyecto. Complementa a `AGENTS.md` (conve
 - **CSRF por `Origin`**: hook `onRequest` que rechaza (403) métodos mutadores con `Origin` presente y no permitido. Complementa las cookies `httpOnly` + `sameSite`.
 - **Integridad financiera**: `payInvoice` transaccional con `SELECT ... FOR UPDATE` y tope al saldo pendiente (400); `createReservation` transaccional con lock de habitación y comprobación de solapamiento inline (409); ventas TPV con precio y stock calculados en servidor (decremento atómico con guard, 409 si insuficiente) y `roomId` solo con `cargo_habitacion`; cancelar una reserva en `checkin` se bloquea (400) para no liberar una habitación ocupada.
 - **Sin `@vercel/analytics`**: no era necesario para un PMS interno y no queremos terceros recebendo datos de uso.
-- **Consentimientos sin persistencia**: `acceptTerms` y `acceptCancellationPolicy` se exigen en API y UI, pero no se guardan (decisión del usuario; evita migración y dado personal extra). Consecuencia: las páginas legales NO deben afirmar que el consentimiento queda registrado.
+- **Consentimientos persistidos**: `acceptTerms` se guarda en `users.terms_accepted_at` al registrar y `acceptCancellationPolicy` en `reservations.cancellation_policy_accepted_at` al crear la reserva (fecha ISO del servidor, migración `0005`). Los registros previos quedan en `NULL`; las páginas legales ya pueden afirmar que queda constancia.
 - **Datos fiscales en tabla `settings`** (fila única `main`) y no en `users`: es un solo negocio por instalación y así el informe/voucher leen de una fuente. `GET` es para cualquier autenticado, `PATCH` solo admin. La migración `0003` inserta la fila `main` para que instalaciones existentes no queden sin datos.
 - **Campos de huésped opcionales** (`country`, `email`, `phone`): antes obligatorios y el frontend rellenaba datos ficticios (`XX`, `000000`). Ahora el schema acepta vacío o ausencia.
 - **XLSX en vez de CSV** para exportar informes (`write-excel-file@4.1.1`): csv no permite header formateado; se descartó exceljs (21MB + polyfills browser) y SheetJS free (sin estilos, npm desactualizado). Header con celdas combinadas A:D, fondos, números reales con formato `$#,##0` y fila Total.
@@ -56,14 +56,17 @@ Documento de **estado dinámico** del proyecto. Complementa a `AGENTS.md` (conve
 
 ## Log de cambios recientes (podar lo viejo)
 
-- (sin commit) seguridad: sesiones refresh + rotación/revocación, lockout login, CSRF Origin, integridad financiera (pagos/reservas/stock), gating registro, next 16.3.8 + fastify 5.12.5, overrides de auditoría
+- (sin commit) alta/edicion de huesped: pais como desplegable y prefijo telefonico automatico segun pais (`frontend/lib/countries.ts`, 250 paises)
+- (sin commit) consentimientos persistidos: `users.terms_accepted_at` y `reservations.cancellation_policy_accepted_at` (migración `0005`); Docker con límites de RAM/CPU y Postgres tuneado
+- `97723b5` docs: conteos de tests y estado de seguridad
+- `ab4252f` chore(deps): next 16.3.8 + fastify 5.12.5 + overrides de auditoría
+- `a007a8f` feat(frontend): hardening de cabeceras y enlaces
+- `10204af` fix(backend): integridad financiera y validación de querystrings
+- `c2e265c` feat(backend): sesiones refresh revocables, lockout y CSRF
 - `fd8888e` feat(frontend): validacion numerica en inputs con aviso inline
 - `6c6d78b` feat: auditoria de 7 fases + legal, settings y consentimiento; reversión estética conservando accesibilidad; fix migración settings
 - `726bfce` docs: memoria del proyecto + documentación actualizada
 - `f89ee01` feat: informes exportables en XLSX y PDF con header del hotel
-- `b02394b` feat: exportacion PDF e header del hotel en informes
-- `9fe2ef2` feat: factura en curso refleja los cargos del TPV al instante
-- `7d664fd` feat: rediseño de facturas con Sheet lateral y voucher de una sola hoja al imprimir
 
 ## Gotchas técnicos aprendidos
 

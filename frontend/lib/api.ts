@@ -18,6 +18,7 @@ export interface AuthUser {
   email: string
   role: 'admin' | 'recepcion'
   hotelName: string | null
+  termsAcceptedAt?: string | null
 }
 
 export interface AuthResponse {

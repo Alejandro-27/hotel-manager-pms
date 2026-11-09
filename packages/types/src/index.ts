@@ -33,6 +33,7 @@ export interface Reservation {
   advancePayment: number
   paymentMethod: 'efectivo' | 'tarjeta' | 'transferencia'
   notes: string
+  cancellationPolicyAcceptedAt?: string | null
 }
 
 export interface Product {

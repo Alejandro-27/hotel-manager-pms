@@ -168,6 +168,7 @@ describe('autenticacion', () => {
     })
     expect(res.statusCode).toBe(200)
     expect(res.json().role).toBe('recepcion')
+    expect(res.json().termsAcceptedAt).toEqual(expect.any(String))
   })
 })
 
@@ -512,7 +513,9 @@ describe('reservas y productos', () => {
       },
     })
     expect(created.statusCode).toBe(201)
-    const reservationId = (created.json() as { id: string }).id
+    const createdBody = created.json() as { id: string; cancellationPolicyAcceptedAt: string | null }
+    expect(createdBody.cancellationPolicyAcceptedAt).toEqual(expect.any(String))
+    const reservationId = createdBody.id
 
     const cancel1 = await app.inject({
       method: 'PATCH',

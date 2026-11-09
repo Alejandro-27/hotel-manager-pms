@@ -36,6 +36,13 @@
       "when": 1790960962306,
       "tag": "0004_eager_juggernaut",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794242774338,
+      "tag": "0005_lumpy_prowler",
+      "breakpoints": true
     }
   ]
 }

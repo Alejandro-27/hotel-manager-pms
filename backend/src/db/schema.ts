@@ -7,6 +7,7 @@ export const users = pgTable('users', {
   passwordHash: text('password_hash').notNull(),
   role: text('role', { enum: ['admin', 'recepcion', 'catering', 'contabilidad'] }).notNull().default('recepcion'),
   hotelName: text('hotel_name'),
+  termsAcceptedAt: text('terms_accepted_at'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 })
@@ -45,6 +46,7 @@ export const reservations = pgTable('reservations', {
   advancePayment: real('advance_payment').notNull().default(0),
   paymentMethod: text('payment_method', { enum: ['efectivo', 'tarjeta', 'transferencia'] }).notNull(),
   notes: text('notes').notNull().default(''),
+  cancellationPolicyAcceptedAt: text('cancellation_policy_accepted_at'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 })

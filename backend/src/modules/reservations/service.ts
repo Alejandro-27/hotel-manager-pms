@@ -87,6 +87,7 @@ export async function createReservation(input: CreateReservationInput) {
     await tx.insert(reservations).values({
       id,
       ...input,
+      cancellationPolicyAcceptedAt: now,
       advancePayment,
       status: 'confirmada',
       totalAmount,

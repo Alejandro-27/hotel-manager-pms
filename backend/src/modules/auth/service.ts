@@ -14,6 +14,7 @@ export interface PublicUser {
   email: string
   role: string
   hotelName: string | null
+  termsAcceptedAt: string | null
 }
 
 const LOGIN_MAX_FAILS = 5
@@ -22,8 +23,22 @@ const DUMMY_HASH = '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy
 
 const loginAttempts = new Map<string, { fails: number; lockedUntil: number }>()
 
-function toPublicUser(u: { id: string; name: string; email: string; role: string; hotelName: string | null }): PublicUser {
-  return { id: u.id, name: u.name, email: u.email, role: u.role, hotelName: u.hotelName }
+function toPublicUser(u: {
+  id: string
+  name: string
+  email: string
+  role: string
+  hotelName: string | null
+  termsAcceptedAt: string | null
+}): PublicUser {
+  return {
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    role: u.role,
+    hotelName: u.hotelName,
+    termsAcceptedAt: u.termsAcceptedAt,
+  }
 }
 
 function registerFailure(email: string) {
@@ -57,6 +72,7 @@ export async function register(input: RegisterInput): Promise<PublicUser> {
     passwordHash,
     role: isFirstUser ? 'admin' : 'recepcion',
     hotelName: input.hotelName ?? null,
+    termsAcceptedAt: now,
     createdAt: now,
     updatedAt: now,
   })

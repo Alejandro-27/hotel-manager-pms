@@ -51,7 +51,7 @@ import {
 import { api } from "@/lib/api"
 import { createPortal } from "react-dom"
 import type { Invoice, Guest, Reservation, Room, Product, BusinessSettings } from "@/lib/types"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, cashChange } from "@/lib/utils"
 import { NumericInput } from "@/components/ui/numeric-input"
 import { InvoiceVoucher } from "@/components/invoice-voucher"
 import { invoiceStatusConfig } from "@/lib/constants"
@@ -540,6 +540,7 @@ function PaymentDialog({
 }) {
   const [amount, setAmount] = useState("")
   const [paymentMethod, setPaymentMethod] = useState("efectivo")
+  const [cashReceived, setCashReceived] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -547,14 +548,22 @@ function PaymentDialog({
     if (invoice) {
       setAmount(String(invoice.totalDue))
       setPaymentMethod("efectivo")
+      setCashReceived("")
       setError(null)
     }
   }, [invoice])
+
+  const change = cashChange(Number(amount), cashReceived)
+  const insufficientCash = change !== null && change < 0
 
   async function handlePay() {
     const value = Number(amount)
     if (!invoice || !value || value <= 0) {
       setError("Ingresa un monto valido")
+      return
+    }
+    if (paymentMethod === "efectivo" && insufficientCash) {
+      setError("El efectivo recibido es menor que el monto a pagar")
       return
     }
     setSubmitting(true)
@@ -592,7 +601,13 @@ function PaymentDialog({
           </div>
           <div className="grid gap-2">
             <Label htmlFor="pay-method">Metodo de pago</Label>
-            <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+            <Select
+              value={paymentMethod}
+              onValueChange={(v) => {
+                setPaymentMethod(v)
+                if (v !== "efectivo") setCashReceived("")
+              }}
+            >
               <SelectTrigger id="pay-method">
                 <SelectValue />
               </SelectTrigger>
@@ -603,6 +618,32 @@ function PaymentDialog({
               </SelectContent>
             </Select>
           </div>
+          {paymentMethod === "efectivo" && (
+            <div className="grid gap-2">
+              <Label htmlFor="pay-cash-received">Efectivo recibido</Label>
+              <NumericInput
+                id="pay-cash-received"
+                mode="decimal"
+                min="0"
+                step="0.01"
+                value={cashReceived}
+                onValueChange={setCashReceived}
+                placeholder="Importe entregado"
+              />
+              {change !== null && (
+                <div
+                  className={`flex items-center justify-between rounded-md px-3 py-2 text-sm ${
+                    insufficientCash
+                      ? "bg-destructive/10 text-destructive"
+                      : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                  }`}
+                >
+                  <span>{insufficientCash ? "Falta" : "Cambio"}</span>
+                  <span className="font-semibold">{formatCurrency(Math.abs(change))}</span>
+                </div>
+              )}
+            </div>
+          )}
           {error && (
             <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
               <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
@@ -612,7 +653,7 @@ function PaymentDialog({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handlePay} disabled={submitting}>
+          <Button onClick={handlePay} disabled={submitting || insufficientCash}>
             {submitting ? "Registrando..." : "Confirmar Pago"}
           </Button>
         </DialogFooter>

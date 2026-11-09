@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, eq, gt, inArray } from 'drizzle-orm'
 import type { RoomStatus } from '@hotel/types'
 import { db } from '../../db/index.js'
-import { rooms } from '../../db/schema.js'
+import { reservations, rooms } from '../../db/schema.js'
 import { AppError } from '../../plugins/error-handler.js'
 import type { CreateRoomInput, UpdateRoomInput, UpdateRoomStatusInput } from './schemas.js'
 
@@ -12,15 +12,37 @@ export interface RoomFilters {
   floor?: number
 }
 
-export async function listRooms(filters: RoomFilters = {}) {
-  const conditions = []
-  if (filters.status) conditions.push(eq(rooms.status, filters.status))
-  if (filters.type) conditions.push(eq(rooms.type, filters.type))
-  if (filters.floor !== undefined) conditions.push(eq(rooms.floor, filters.floor))
+export function todayISO(): string {
+  const now = new Date()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${now.getFullYear()}-${month}-${day}`
+}
 
-  const query = db.select().from(rooms)
-  const filtered = conditions.length > 0 ? query.where(and(...conditions)) : query
-  return filtered.orderBy(asc(rooms.floor), asc(rooms.number))
+/** Habitaciones con reserva vigente: check-in activo o reserva confirmada que aun no termina. */
+export async function getOccupiedRoomIds(): Promise<Set<string>> {
+  const active = await db.select({ roomId: reservations.roomId }).from(reservations).where(and(
+    inArray(reservations.status, ['confirmada', 'checkin']),
+    gt(reservations.checkOut, todayISO()),
+  ))
+  return new Set(active.map((row) => row.roomId))
+}
+
+export async function listRooms(filters: RoomFilters = {}) {
+  const occupied = await getOccupiedRoomIds()
+
+  // La ocupacion se deriva de las reservas; el estado guardado solo manda en mantenimiento/limpieza.
+  const rows = (await db.select().from(rooms)).map((room) =>
+    occupied.has(room.id) && room.status !== 'mantenimiento' && room.status !== 'limpieza'
+      ? { ...room, status: 'ocupada' as RoomStatus }
+      : room,
+  )
+
+  return rows
+    .filter((room) => !filters.status || room.status === filters.status)
+    .filter((room) => !filters.type || room.type === filters.type)
+    .filter((room) => filters.floor === undefined || room.floor === filters.floor)
+    .sort((a, b) => a.floor - b.floor || a.number.localeCompare(b.number))
 }
 
 export async function getRoomById(id: string) {

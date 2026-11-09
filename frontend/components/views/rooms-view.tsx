@@ -57,6 +57,11 @@ interface NewRoomForm {
 
 const emptyForm: NewRoomForm = { number: "", floor: "1", type: "doble", maxCapacity: "2", pricePerNight: "" }
 
+function todayISO() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+}
+
 export function RoomsView() {
   const [filterFloor, setFilterFloor] = useState<string>("all")
   const [filterType, setFilterType] = useState<string>("all")
@@ -79,7 +84,7 @@ export function RoomsView() {
     setError(null)
     Promise.all([
       api.rooms.get(),
-      api.reservations.get({ status: "checkin" }),
+      api.reservations.get(),
       api.guests.get(),
     ])
       .then(([r, res, g]) => {
@@ -112,7 +117,11 @@ export function RoomsView() {
 
   const occupantByRoom = useMemo(() => {
     const map = new Map<string, Guest>()
-    activeReservations.forEach((r) => {
+    const today = todayISO()
+    const vigentes = activeReservations
+      .filter((r) => (r.status === "confirmada" || r.status === "checkin") && r.checkOut > today)
+      .sort((a, b) => (a.status === "checkin" ? -1 : 0) - (b.status === "checkin" ? -1 : 0))
+    vigentes.forEach((r) => {
       if (!map.has(r.roomId)) {
         const guest = guestMap.get(r.guestId)
         if (guest) map.set(r.roomId, guest)

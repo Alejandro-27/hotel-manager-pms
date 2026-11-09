@@ -15,8 +15,8 @@ Documento de **estado dinámico** del proyecto. Complementa a `AGENTS.md` (conve
 ## Snapshot actual
 
 - Fecha: 2026-11-09 · Rama: `main` · Último commit: buscador de pais por nombre en reservas y huespedes
-- **Pendiente de commit**: ninguno.
-- Código fuente: `tsc` limpio en frontend y backend; lint frontend 0 errores / 6 warnings (baseline); `pnpm test` **71/71**; `pnpm test:api` **33/33**; `pnpm build` OK (Next 16.3.8).
+- **Pendiente de commit**: ocupacion derivada de reservas, estado manual en Gestion de Habitaciones, huesped actual y validacion de duplicados (documento/email/telefono).
+- Código fuente: `tsc` limpio en frontend y backend; lint frontend 0 errores / 6 warnings (baseline); `pnpm test` **71/71**; `pnpm test:api` **35/35**; `pnpm build` OK (Next 16.3.8).
 - **Auditoría de dependencias**: `pnpm audit --prod` → 0 vulnerabilidades. En dev queda 1 moderada (`esbuild@0.18.20` vía `drizzle-kit`/`@esbuild-kit`; solo afecta al dev-server de esbuild, no se usa así). Resuelto con `overrides` en `pnpm-workspace.yaml` (pnpm v12 ya no lee `pnpm.overrides` de `package.json`).
 - Revertidos los cambios **visuales** de la auditoría de 7 fases a petición del usuario: la estética previa queda intacta. Se conserva la funcionalidad (legal, settings, consentimientos) y atributos sin impacto (`aria-*`, foco).
 - Browser bridge roto → verificación visual manual en `pnpm dev` (pendiente comprobar la CSP de producción, que solo aplica con `next build && next start`).
@@ -26,11 +26,13 @@ Documento de **estado dinámico** del proyecto. Complementa a `AGENTS.md` (conve
 | Recurso | Conteo | Fuente |
 |---|---|---|
 | Frontend | 71 tests | `pnpm test` |
-| Backend | 33 tests | `pnpm test:api` (verificado 2026-10-02, 33/33) |
+| Backend | 35 tests | `pnpm test:api` (verificado 2026-11-09, 35/35) |
 | Bruno | 46 requests | `backend/bruno/` |
 
 ## Decisiones recientes (con su porqué)
 
+- **Ocupacion derivada de reservas**: `getOccupiedRoomIds()` considera vigente toda reserva `confirmada`/`checkin` con `checkOut > hoy` (incluye futuras); `listRooms()` superpone `ocupada` sobre el estado guardado salvo `mantenimiento`/`limpieza`. Al pasar el check-out la habitacion se libera sola, sin escrituras ni jobs. `rooms-view` muestra el huesped de la reserva vigente y permite cambiar el estado guardado.
+- **Cambio en efectivo**: helper `cashChange(total, received)` en `lib/utils.ts`; se muestra en TPV, anticipo de reserva y pago de factura, y bloquea el cobro si el efectivo no llega.
 - **Sesiones refresh server-side** (`refresh_sessions`) con rotación obligatoria: cada `/api/auth/refresh` invalida el token usado y emite uno nuevo; logout y cambio de contraseña revocan todas. Cierra el agujero de refresh no revocable. El `jti` va **en el payload** (los tipos de `@fastify/jwt` no aceptan la opción `jwtid`).
 - **Registro público cerrado por defecto** (`ALLOW_REGISTRATION=false`): el primer usuario (bootstrap, cuando no hay ninguno) siempre puede registrarse; el resto da 403. En dev queda abierto.
 - **Lockout de login en memoria** (5 fallos → 15 min, por proceso; coherente con el store del rate-limit): suficiente para una sola instancia. Con varias réplicas necesita store compartido (Redis).
@@ -56,6 +58,7 @@ Documento de **estado dinámico** del proyecto. Complementa a `AGENTS.md` (conve
 
 ## Log de cambios recientes (podar lo viejo)
 
+- (sin commit) habitaciones: ocupacion derivada de reservas (checkOut > hoy, liberacion al terminar), huesped actual en Gestion de Habitaciones y bloqueo de documento/email/telefono duplicados; efectivo recibido con cambio en anticipo de reserva y pago de factura
 - feat(ui): buscador de pais por nombre en reservas y edicion de huesped (`CountryCombobox` con cmdk y filtro sin acentos)
 - `84c6f75` feat(tpv): seleccion de habitacion ocupada al cargar productos, calculo de cambio en efectivo y categorias `almuerzos`/`cenas`
 - `6b42e19` docs: consentimientos persistidos, desplegable de pais y conteos

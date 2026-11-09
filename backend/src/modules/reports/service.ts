@@ -1,6 +1,7 @@
 import { and, desc, eq, gte, like, sql } from 'drizzle-orm'
 import { db } from '../../db/index.js'
 import { expenses, invoices, products, reservations, rooms, sales } from '../../db/schema.js'
+import { getOccupiedRoomIds } from '../rooms/service.js'
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10)
@@ -14,9 +15,15 @@ function monthStart(offset: number): string {
 
 const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
+function effectiveStatus(room: { id: string; status: string }, occupiedIds: Set<string>) {
+  if (room.status === 'mantenimiento' || room.status === 'limpieza') return room.status
+  return occupiedIds.has(room.id) ? 'ocupada' : room.status
+}
+
 export async function getDashboard() {
   const allRooms = await db.select().from(rooms)
-  const occupied = allRooms.filter(r => r.status === 'ocupada').length
+  const occupiedIds = await getOccupiedRoomIds()
+  const occupied = allRooms.filter(r => effectiveStatus(r, occupiedIds) === 'ocupada').length
   const occupancyRate = allRooms.length > 0 ? Math.round((occupied / allRooms.length) * 100) : 0
 
   const today = todayStr()
@@ -80,21 +87,22 @@ export async function getFinancialReport(months = 6) {
 
 export async function getOccupancyReport() {
   const allRooms = await db.select().from(rooms)
+  const occupiedIds = await getOccupiedRoomIds()
   const total = allRooms.length
-  const occupied = allRooms.filter(r => r.status === 'ocupada').length
+  const occupied = allRooms.filter(r => effectiveStatus(r, occupiedIds) === 'ocupada').length
 
   const byType = ['individual', 'doble', 'suite', 'familiar'].map(type => {
     const roomsOfType = allRooms.filter(r => r.type === type)
     return {
       type,
       total: roomsOfType.length,
-      occupied: roomsOfType.filter(r => r.status === 'ocupada').length,
+      occupied: roomsOfType.filter(r => effectiveStatus(r, occupiedIds) === 'ocupada').length,
     }
   })
 
   const byStatus = ['libre', 'ocupada', 'mantenimiento', 'limpieza'].map(status => ({
     status,
-    count: allRooms.filter(r => r.status === status).length,
+    count: allRooms.filter(r => effectiveStatus(r, occupiedIds) === status).length,
   }))
 
   return {

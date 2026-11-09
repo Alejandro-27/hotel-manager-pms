@@ -47,7 +47,7 @@ pnpm test         # Vitest + React Testing Library (71 tests)
     ├── validations.ts      ← Schemas zod para formularios
     ├── constants.tsx       ← Configuraciones compartidas
     ├── export-report.ts    ← Export XLSX de informes (write-excel-file)
-    └── utils.ts            ← cn(), formatCurrency(), periodRangeLabel()
+    └── utils.ts            ← cn(), formatCurrency(), cashChange(), periodRangeLabel()
 ```
 
 ## Convenciones

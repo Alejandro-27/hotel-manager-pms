@@ -27,7 +27,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { AlertCircle, ChevronLeft, ChevronRight, Plus, RefreshCw, XCircle } from "lucide-react"
 import Link from "next/link"
 import { api } from "@/lib/api"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, cashChange } from "@/lib/utils"
 import { NumericInput } from "@/components/ui/numeric-input"
 import { roomStatusConfig } from "@/lib/constants"
 import type { Room, Reservation, Guest, RoomStatus } from "@/lib/types"
@@ -75,6 +75,10 @@ export function CalendarView() {
   const [formCheckOut, setFormCheckOut] = useState("")
   const [formGuests, setFormGuests] = useState("1")
   const [formPayment, setFormPayment] = useState<(typeof paymentMethods)[number]>("efectivo")
+  const [formAdvance, setFormAdvance] = useState("")
+  const [formCashReceived, setFormCashReceived] = useState("")
+  const formCashChange = cashChange(Number(formAdvance) || 0, formCashReceived)
+  const formInsufficientCash = formCashChange !== null && formCashChange < 0
   const [acceptCancellationPolicy, setAcceptCancellationPolicy] = useState(false)
 
   const [detailEntry, setDetailEntry] = useState<{ reservation: Reservation; guest: Guest | undefined } | null>(null)
@@ -144,6 +148,8 @@ export function CalendarView() {
     setFormCheckOut(date)
     setFormGuests("1")
     setFormPayment("efectivo")
+    setFormAdvance("")
+    setFormCashReceived("")
     setCreateError(null)
     setAcceptCancellationPolicy(false)
     setDialogOpen(true)
@@ -169,6 +175,10 @@ export function CalendarView() {
 
   async function handleCreateReservation() {
     if (!selectedCell) return
+    if (formPayment === "efectivo" && formInsufficientCash) {
+      setCreateError("El efectivo recibido es menor que el anticipo")
+      return
+    }
     setCreating(true)
     setCreateError(null)
     try {
@@ -179,6 +189,7 @@ export function CalendarView() {
         checkOut: formCheckOut,
         guests: Number(formGuests),
         paymentMethod: formPayment,
+        advancePayment: Number(formAdvance) || 0,
         acceptCancellationPolicy,
       })
       setDialogOpen(false)
@@ -397,7 +408,13 @@ export function CalendarView() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="payment-method">Metodo de pago</Label>
-                <Select value={formPayment} onValueChange={(v) => setFormPayment(v as (typeof paymentMethods)[number])}>
+                <Select
+                  value={formPayment}
+                  onValueChange={(v) => {
+                    setFormPayment(v as (typeof paymentMethods)[number])
+                    if (v !== "efectivo") setFormCashReceived("")
+                  }}
+                >
                   <SelectTrigger id="payment-method">
                     <SelectValue />
                   </SelectTrigger>
@@ -409,6 +426,46 @@ export function CalendarView() {
                 </Select>
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="advance">Anticipo (opcional)</Label>
+                <NumericInput
+                  id="advance"
+                  mode="decimal"
+                  min="0"
+                  step="0.01"
+                  value={formAdvance}
+                  onValueChange={setFormAdvance}
+                  placeholder="0"
+                />
+              </div>
+              {formPayment === "efectivo" && (
+                <div className="grid gap-2">
+                  <Label htmlFor="calendar-cash-received">Efectivo recibido</Label>
+                  <NumericInput
+                    id="calendar-cash-received"
+                    mode="decimal"
+                    min="0"
+                    step="0.01"
+                    value={formCashReceived}
+                    onValueChange={setFormCashReceived}
+                    placeholder="Importe entregado"
+                  />
+                </div>
+              )}
+            </div>
+            {formPayment === "efectivo" && formCashChange !== null && (
+              <div
+                className={`flex items-center justify-between rounded-md px-3 py-2 text-sm ${
+                  formInsufficientCash
+                    ? "bg-destructive/10 text-destructive"
+                    : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                }`}
+              >
+                <span>{formInsufficientCash ? "Falta" : "Cambio"}</span>
+                <span className="font-semibold">{formatCurrency(Math.abs(formCashChange))}</span>
+              </div>
+            )}
             <label className="flex cursor-pointer items-start gap-2 text-sm">
               <Checkbox
                 id="calendar-accept-cancellation"
@@ -437,7 +494,7 @@ export function CalendarView() {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
             <Button
               onClick={handleCreateReservation}
-              disabled={creating || !formGuestId || !acceptCancellationPolicy}
+              disabled={creating || !formGuestId || !acceptCancellationPolicy || formInsufficientCash}
             >
               {creating ? (
                 <span className="flex items-center gap-2">

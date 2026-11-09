@@ -28,7 +28,7 @@ pnpm test             # Vitest (fastify.inject contra BD hotel_manager_test)
 src/
 ├── app.ts              ← buildApp(): Fastify + CORS + plugins + rutas (exportado para Vercel)
 ├── index.ts            ← migrate on boot + listen (PORT 3001)
-├── api.test.ts         ← Tests de API (fastify.inject, 33 tests)
+├── api.test.ts         ← Tests de API (fastify.inject, 35 tests)
 ├── config/env.ts       ← DATABASE_URL, JWT_SECRET, PORT, CORS_ORIGIN, TRUST_PROXY, ALLOW_REGISTRATION
 ├── db/
 │   ├── index.ts        ← postgres client (pool max: 10) + drizzle instance
@@ -144,7 +144,7 @@ await db.delete(rooms).where(eq(rooms.id, id))
 | GET | /api/auth/me | Sí | Datos del usuario actual |
 | PATCH | /api/auth/profile | Sí | Actualiza name / hotelName |
 | POST | /api/auth/password | Sí | Cambia contraseña (valida la actual) |
-| GET | /api/rooms | Sí | Lista habitaciones (filtros: status, floor, type) |
+| GET | /api/rooms | Sí | Lista habitaciones (filtros: status, floor, type); sincroniza libre/ocupada con las reservas antes de listar |
 | POST | /api/rooms | Admin | Crear habitación |
 | GET | /api/rooms/:id | Sí | Detalle habitación |
 | PATCH | /api/rooms/:id | Admin | Actualizar habitación |

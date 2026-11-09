@@ -531,6 +531,105 @@ describe('reservas y productos', () => {
     })
     expect(cancel2.statusCode).toBe(409)
   })
+
+  it('ocupa la habitacion mientras la reserva cubre hoy y la libera al cancelar', async () => {
+    const adminToken = await loginAsAdmin()
+    const token = await registerUser(`res-ocup-${Date.now()}@test.com`)
+
+    const iso = (offset: number) => {
+      const date = new Date()
+      date.setDate(date.getDate() + offset)
+      return date.toISOString().split('T')[0]
+    }
+
+    const guest = await app.inject({
+      method: 'POST',
+      url: '/api/guests',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { name: 'Huesped Ocupacion', document: `OCU-${Date.now()}` },
+    })
+    const guestId = (guest.json() as { id: string }).id
+
+    const room = await app.inject({
+      method: 'POST',
+      url: '/api/rooms',
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { number: `O-${Date.now()}`, floor: 1, type: 'doble', maxCapacity: 2, pricePerNight: 80 },
+    })
+    const roomId = (room.json() as { id: string }).id
+
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/reservations',
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        guestId,
+        roomId,
+        checkIn: iso(-1),
+        checkOut: iso(1),
+        guests: 1,
+        paymentMethod: 'efectivo',
+        acceptCancellationPolicy: true,
+      },
+    })
+    expect(created.statusCode).toBe(201)
+
+    const roomStatus = async () => {
+      const list = await app.inject({
+        method: 'GET',
+        url: '/api/rooms',
+        headers: { authorization: `Bearer ${token}` },
+      })
+      return (list.json() as { id: string; status: string }[]).find((r) => r.id === roomId)?.status
+    }
+
+    expect(await roomStatus()).toBe('ocupada')
+
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/reservations/${(created.json() as { id: string }).id}/cancel`,
+      headers: { authorization: `Bearer ${token}` },
+    })
+
+    expect(await roomStatus()).toBe('libre')
+  })
+})
+
+describe('duplicados de huesped', () => {
+  it('rechaza documento, email o telefono ya registrados', async () => {
+    const token = await registerUser(`dup-${Date.now()}@test.com`)
+    const stamp = Date.now()
+    const base = {
+      name: 'Huesped Duplicado',
+      document: `DUP-${stamp}`,
+      email: `dup-${stamp}@test.com`,
+      phone: `+3460${String(stamp).slice(-7)}`,
+    }
+
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/guests',
+      headers: { authorization: `Bearer ${token}` },
+      payload: base,
+    })
+    expect(created.statusCode).toBe(201)
+
+    const payloads = [
+      { ...base, email: `a-${stamp}@test.com`, phone: `+3461${String(stamp).slice(-7)}` },
+      { ...base, document: `DUP-B-${stamp}`, email: base.email, phone: `+3462${String(stamp).slice(-7)}` },
+      { ...base, document: `DUP-C-${stamp}`, email: `c-${stamp}@test.com`, phone: base.phone },
+    ]
+
+    for (const payload of payloads) {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/guests',
+        headers: { authorization: `Bearer ${token}` },
+        payload,
+      })
+      expect(res.statusCode).toBe(409)
+    }
+  })
 })
 
 describe('ciclo de vida de productos', () => {
@@ -634,11 +733,12 @@ describe('factura en curso por cargo a habitacion', () => {
     const adminToken = await loginAsAdmin()
     const token = await registerUser(`estancia-${Date.now()}-${Math.random().toString(36).slice(2)}@test.com`)
 
+    const suffix = `${Date.now()}${Math.floor(Math.random() * 1000)}`
     const guest = await app.inject({
       method: 'POST',
       url: '/api/guests',
       headers: { authorization: `Bearer ${token}` },
-      payload: { name: 'Huesped Estancia', document: `DOC-E-${Date.now()}`, country: 'ES', email: 'e@t.com', phone: '600000001' },
+      payload: { name: 'Huesped Estancia', document: `DOC-E-${suffix}`, country: 'ES', email: `e-${suffix}@t.com`, phone: `6${suffix.slice(-8)}` },
     })
     expect(guest.statusCode).toBe(201)
     const guestId = (guest.json() as { id: string }).id

@@ -25,7 +25,7 @@ import { AlertTriangle, ChevronRight, UserCheck, AlertCircle } from "lucide-reac
 import Link from "next/link"
 import { api } from "@/lib/api"
 import type { Guest, Room } from "@/lib/types"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, cashChange } from "@/lib/utils"
 import { applyDialPrefix } from "@/lib/countries"
 import { CountryCombobox } from "@/components/country-combobox"
 import { NumericInput } from "@/components/ui/numeric-input"
@@ -68,6 +68,7 @@ export function BookingWizard({
   const [checkOut, setCheckOut] = useState("")
   const [numGuests, setNumGuests] = useState("1")
   const [paymentMethod, setPaymentMethod] = useState<(typeof paymentMethods)[number]>("efectivo")
+  const [cashReceived, setCashReceived] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [acceptCancellationPolicy, setAcceptCancellationPolicy] = useState(false)
@@ -78,10 +79,26 @@ export function BookingWizard({
     return guests.find((g) => g.document.trim().toLowerCase() === doc)
   }, [guests, guestForm.document])
 
+  const emailConflict = useMemo(() => {
+    const email = guestForm.email.trim().toLowerCase()
+    if (!email) return undefined
+    return guests.find((g) => g.email.trim().toLowerCase() === email && g.id !== matchingGuest?.id)
+  }, [guests, guestForm.email, matchingGuest])
+
+  const phoneConflict = useMemo(() => {
+    const phone = guestForm.phone.trim()
+    if (!phone) return undefined
+    return guests.find((g) => g.phone.trim() === phone && g.id !== matchingGuest?.id)
+  }, [guests, guestForm.phone, matchingGuest])
+
+  const hasConflict = Boolean(emailConflict || phoneConflict)
+
   const selectedRoom = rooms.find((r) => r.id === selectedRoomId)
   const nights = nightsBetween(checkIn, checkOut)
   const subtotal = selectedRoom ? selectedRoom.pricePerNight * nights : 0
   const advance = Math.round(subtotal * 0.3)
+  const change = cashChange(advance, cashReceived)
+  const insufficientCash = change !== null && change < 0
 
   const availableRooms = useMemo(() => {
     return rooms
@@ -98,6 +115,7 @@ export function BookingWizard({
     setCheckOut("")
     setNumGuests("1")
     setPaymentMethod("efectivo")
+    setCashReceived("")
     setError(null)
     setAcceptCancellationPolicy(false)
   }
@@ -122,12 +140,20 @@ export function BookingWizard({
           return
         }
       }
+      if (hasConflict) {
+        setError("El email o telefono ya pertenece a otro huesped. Cambialo para continuar.")
+        return
+      }
       setStep(2)
       return
     }
     if (step === 2) {
       if (!selectedRoomId) {
         setError("Selecciona una habitacion")
+        return
+      }
+      if (!availableRooms.some((r) => r.id === selectedRoomId)) {
+        setError("La habitacion seleccionada ya no esta disponible")
         return
       }
       if (!checkIn || !checkOut) {
@@ -145,6 +171,16 @@ export function BookingWizard({
   async function confirm() {
     setSubmitting(true)
     setError(null)
+    if (paymentMethod === "efectivo" && insufficientCash) {
+      setError("El efectivo recibido es menor que el anticipo a cobrar")
+      setSubmitting(false)
+      return
+    }
+    if (hasConflict) {
+      setError("El email o telefono ya pertenece a otro huesped. Cambialo para continuar.")
+      setSubmitting(false)
+      return
+    }
     if (!acceptCancellationPolicy) {
       setError("Debes aceptar la politica de cancelacion para confirmar la reserva")
       setSubmitting(false)
@@ -215,7 +251,8 @@ export function BookingWizard({
               <div className="flex items-start gap-2 rounded-md border border-primary/30 bg-primary/5 p-3 text-sm text-foreground">
                 <UserCheck className="size-4 text-primary mt-0.5 shrink-0" />
                 <span>
-                  Huesped existente: <strong>{matchingGuest.name}</strong> — no se creara una cuenta nueva.
+                  El documento ya esta registrado a nombre de <strong>{matchingGuest.name}</strong>. Se usara ese
+                  huesped, no se creara uno nuevo.
                 </span>
               </div>
             )}
@@ -257,7 +294,13 @@ export function BookingWizard({
                   placeholder="+34..."
                   value={guestForm.phone}
                   onChange={(e) => setGuestForm({ ...guestForm, phone: e.target.value })}
+                  aria-invalid={!!phoneConflict}
                 />
+                {phoneConflict && (
+                  <p className="text-xs text-destructive">
+                    Ya existe un huesped con este telefono: {phoneConflict.name}
+                  </p>
+                )}
               </div>
             </div>
             <div className="grid gap-2">
@@ -267,7 +310,13 @@ export function BookingWizard({
                 placeholder="correo@email.com"
                 value={guestForm.email}
                 onChange={(e) => setGuestForm({ ...guestForm, email: e.target.value })}
+                aria-invalid={!!emailConflict}
               />
+              {emailConflict && (
+                <p className="text-xs text-destructive">
+                  Ya existe un huesped con este email: {emailConflict.name}
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -351,7 +400,13 @@ export function BookingWizard({
             </div>
             <div className="grid gap-2">
               <Label>Metodo de pago</Label>
-              <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as (typeof paymentMethods)[number])}>
+              <Select
+                value={paymentMethod}
+                onValueChange={(v) => {
+                  setPaymentMethod(v as (typeof paymentMethods)[number])
+                  if (v !== "efectivo") setCashReceived("")
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -362,6 +417,34 @@ export function BookingWizard({
                 </SelectContent>
               </Select>
             </div>
+            {paymentMethod === "efectivo" && (
+              <div className="grid gap-2">
+                <Label htmlFor="booking-cash-received" className="text-xs text-muted-foreground">
+                  Efectivo recibido
+                </Label>
+                <NumericInput
+                  id="booking-cash-received"
+                  mode="decimal"
+                  min="0"
+                  step="0.01"
+                  value={cashReceived}
+                  onValueChange={setCashReceived}
+                  placeholder="Importe entregado"
+                />
+                {change !== null && (
+                  <div
+                    className={`flex items-center justify-between rounded-md px-3 py-2 text-sm ${
+                      insufficientCash
+                        ? "bg-destructive/10 text-destructive"
+                        : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                    }`}
+                  >
+                    <span>{insufficientCash ? "Falta" : "Cambio"}</span>
+                    <span className="font-semibold">{formatCurrency(Math.abs(change))}</span>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3">
               <AlertTriangle className="size-4 text-amber-600 mt-0.5 shrink-0" aria-hidden="true" />
               <div>
@@ -418,12 +501,12 @@ export function BookingWizard({
             </Button>
           )}
           {step < 3 ? (
-            <Button onClick={nextStep} disabled={submitting}>
+            <Button onClick={nextStep} disabled={submitting || (step === 1 && hasConflict)}>
               Siguiente
               <ChevronRight className="ml-1 size-4" aria-hidden="true" />
             </Button>
           ) : (
-            <Button onClick={confirm} disabled={submitting || !acceptCancellationPolicy}>
+            <Button onClick={confirm} disabled={submitting || !acceptCancellationPolicy || insufficientCash}>
               {submitting ? "Creando reserva..." : "Confirmar Reserva"}
             </Button>
           )}

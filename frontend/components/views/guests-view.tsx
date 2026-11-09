@@ -43,6 +43,7 @@ import {
 import { api } from "@/lib/api"
 import { BookingWizard } from "@/components/views/booking-wizard"
 import type { Guest, Reservation, Room, ReservationStatus } from "@/lib/types"
+import { countries as countryOptions, countryByCode, applyDialPrefix } from "@/lib/countries"
 
 const statusStyles: Record<ReservationStatus, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
   confirmada: { label: "Confirmada", variant: "secondary" },
@@ -397,12 +398,32 @@ export function GuestsView() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label>Pais (ISO 3166)</Label>
-                  <Input
-                    maxLength={2}
+                  <Label>Pais</Label>
+                  <Select
                     value={editGuest.country}
-                    onChange={(e) => setEditGuest({ ...editGuest, country: e.target.value.toUpperCase() })}
-                  />
+                    onValueChange={(value) =>
+                      setEditGuest((guest) =>
+                        guest
+                          ? {
+                              ...guest,
+                              country: value,
+                              phone: applyDialPrefix(guest.phone, countryByCode[value]?.dial ?? ""),
+                            }
+                          : guest
+                      )
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Selecciona pais" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {countryOptions.map((country) => (
+                        <SelectItem key={country.code} value={country.code}>
+                          {country.dial ? `${country.name} (${country.dial})` : country.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="grid gap-2">
                   <Label>Telefono</Label>

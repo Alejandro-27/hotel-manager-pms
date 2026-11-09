@@ -43,7 +43,8 @@ import {
 import { api } from "@/lib/api"
 import { BookingWizard } from "@/components/views/booking-wizard"
 import type { Guest, Reservation, Room, ReservationStatus } from "@/lib/types"
-import { countries as countryOptions, countryByCode, applyDialPrefix } from "@/lib/countries"
+import { applyDialPrefix } from "@/lib/countries"
+import { CountryCombobox } from "@/components/country-combobox"
 
 const statusStyles: Record<ReservationStatus, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
   confirmada: { label: "Confirmada", variant: "secondary" },
@@ -399,31 +400,20 @@ export function GuestsView() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label>Pais</Label>
-                  <Select
+                  <CountryCombobox
                     value={editGuest.country}
-                    onValueChange={(value) =>
+                    onValueChange={(country) =>
                       setEditGuest((guest) =>
                         guest
                           ? {
                               ...guest,
-                              country: value,
-                              phone: applyDialPrefix(guest.phone, countryByCode[value]?.dial ?? ""),
+                              country: country.code,
+                              phone: applyDialPrefix(guest.phone, country.dial),
                             }
                           : guest
                       )
                     }
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Selecciona pais" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {countryOptions.map((country) => (
-                        <SelectItem key={country.code} value={country.code}>
-                          {country.dial ? `${country.name} (${country.dial})` : country.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label>Telefono</Label>

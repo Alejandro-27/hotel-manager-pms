@@ -14,9 +14,9 @@ Documento de **estado dinámico** del proyecto. Complementa a `AGENTS.md` (conve
 
 ## Snapshot actual
 
-- Fecha: 2026-10-02 · Rama: `main` · Último commit: `97723b5` (docs: conteos y estado de seguridad)
-- **Pendiente de commit**: consentimientos persistidos (migración `0005`) y optimización de Docker (límites de Postgres).
-- Código fuente: `tsc` limpio en frontend y backend; lint frontend 0 errores / 6 warnings (baseline); `pnpm test` **61/61**; `pnpm test:api` **33/33**; `pnpm build` OK (Next 16.3.8).
+- Fecha: 2026-11-09 · Rama: `main` · Último commit: buscador de pais por nombre en reservas y huespedes
+- **Pendiente de commit**: ninguno.
+- Código fuente: `tsc` limpio en frontend y backend; lint frontend 0 errores / 6 warnings (baseline); `pnpm test` **71/71**; `pnpm test:api` **33/33**; `pnpm build` OK (Next 16.3.8).
 - **Auditoría de dependencias**: `pnpm audit --prod` → 0 vulnerabilidades. En dev queda 1 moderada (`esbuild@0.18.20` vía `drizzle-kit`/`@esbuild-kit`; solo afecta al dev-server de esbuild, no se usa así). Resuelto con `overrides` en `pnpm-workspace.yaml` (pnpm v12 ya no lee `pnpm.overrides` de `package.json`).
 - Revertidos los cambios **visuales** de la auditoría de 7 fases a petición del usuario: la estética previa queda intacta. Se conserva la funcionalidad (legal, settings, consentimientos) y atributos sin impacto (`aria-*`, foco).
 - Browser bridge roto → verificación visual manual en `pnpm dev` (pendiente comprobar la CSP de producción, que solo aplica con `next build && next start`).
@@ -25,7 +25,7 @@ Documento de **estado dinámico** del proyecto. Complementa a `AGENTS.md` (conve
 
 | Recurso | Conteo | Fuente |
 |---|---|---|
-| Frontend | 61 tests | `pnpm test` |
+| Frontend | 71 tests | `pnpm test` |
 | Backend | 33 tests | `pnpm test:api` (verificado 2026-10-02, 33/33) |
 | Bruno | 46 requests | `backend/bruno/` |
 
@@ -56,8 +56,12 @@ Documento de **estado dinámico** del proyecto. Complementa a `AGENTS.md` (conve
 
 ## Log de cambios recientes (podar lo viejo)
 
-- (sin commit) alta/edicion de huesped: pais como desplegable y prefijo telefonico automatico segun pais (`frontend/lib/countries.ts`, 250 paises)
-- (sin commit) consentimientos persistidos: `users.terms_accepted_at` y `reservations.cancellation_policy_accepted_at` (migración `0005`); Docker con límites de RAM/CPU y Postgres tuneado
+- feat(ui): buscador de pais por nombre en reservas y edicion de huesped (`CountryCombobox` con cmdk y filtro sin acentos)
+- `84c6f75` feat(tpv): seleccion de habitacion ocupada al cargar productos, calculo de cambio en efectivo y categorias `almuerzos`/`cenas`
+- `6b42e19` docs: consentimientos persistidos, desplegable de pais y conteos
+- `45d6480` feat(frontend): pais desplegable con prefijo telefonico automatico
+- `1123bca` chore(docker): limites de recursos y tuning de PostgreSQL
+- `8e9f96e` feat(backend): persistir consentimientos con fecha
 - `97723b5` docs: conteos de tests y estado de seguridad
 - `ab4252f` chore(deps): next 16.3.8 + fastify 5.12.5 + overrides de auditoría
 - `a007a8f` feat(frontend): hardening de cabeceras y enlaces

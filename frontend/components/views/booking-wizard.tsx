@@ -26,7 +26,8 @@ import Link from "next/link"
 import { api } from "@/lib/api"
 import type { Guest, Room } from "@/lib/types"
 import { formatCurrency } from "@/lib/utils"
-import { countries, countryByCode, applyDialPrefix } from "@/lib/countries"
+import { applyDialPrefix } from "@/lib/countries"
+import { CountryCombobox } from "@/components/country-combobox"
 import { NumericInput } from "@/components/ui/numeric-input"
 
 const paymentMethods = ["efectivo", "tarjeta", "transferencia"] as const
@@ -239,27 +240,16 @@ export function BookingWizard({
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Pais</Label>
-                <Select
+                <CountryCombobox
                   value={guestForm.country}
-                  onValueChange={(value) =>
+                  onValueChange={(country) =>
                     setGuestForm((form) => ({
                       ...form,
-                      country: value,
-                      phone: applyDialPrefix(form.phone, countryByCode[value]?.dial ?? ""),
+                      country: country.code,
+                      phone: applyDialPrefix(form.phone, country.dial),
                     }))
                   }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Selecciona pais" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {countries.map((country) => (
-                      <SelectItem key={country.code} value={country.code}>
-                        {country.dial ? `${country.name} (${country.dial})` : country.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                />
               </div>
               <div className="grid gap-2">
                 <Label>Telefono</Label>

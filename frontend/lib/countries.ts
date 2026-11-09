@@ -262,6 +262,17 @@ export const countryByCode: Record<string, Country> = Object.fromEntries(
   countries.map((country) => [country.code, country])
 )
 
+const normalize = (value: string) =>
+  value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+
+/** Filtro de cmdk: todas las palabras buscadas deben aparecer en el pais (sin acentos). */
+export function filterCountry(value: string, search: string): number {
+  const words = normalize(search).split(/\s+/).filter(Boolean)
+  if (words.length === 0) return 1
+  const haystack = normalize(value)
+  return words.every((word) => haystack.includes(word)) ? 1 : 0
+}
+
 const dialPrefixes = [...new Set(countries.map((country) => country.dial).filter(Boolean))].sort(
   (a, b) => b.length - a.length
 )

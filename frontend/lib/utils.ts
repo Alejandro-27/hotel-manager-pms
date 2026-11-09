@@ -21,6 +21,14 @@ export function formatCurrency(amount: number, code: string = 'COP'): string {
   }).format(amount)
 }
 
+/** Diferencia entre el efectivo recibido y el total. null si no se indico importe. */
+export function cashChange(total: number, received: string): number | null {
+  if (received.trim() === '') return null
+  const amount = Number(received)
+  if (Number.isNaN(amount)) return null
+  return Math.round((amount - total) * 100) / 100
+}
+
 export function periodRangeLabel(months: number, now: Date = new Date()): string {
   const from = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1)
   const fmt = new Intl.DateTimeFormat('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })

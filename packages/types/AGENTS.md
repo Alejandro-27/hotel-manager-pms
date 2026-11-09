@@ -87,7 +87,7 @@ interface Product {
   active: boolean           // false = desactivado (no se vende ni aparece en el grid del POS)
   createdAt: string
 }
-type ProductCategory = 'desayunos' | 'snacks' | 'bebidas'
+type ProductCategory = 'desayunos' | 'almuerzos' | 'cenas' | 'snacks' | 'bebidas'
 ```
 
 ### Sale
@@ -160,6 +160,8 @@ type InvoiceStatus = 'pagada' | 'parcial' | 'pendiente'
 | Categoría | Ejemplos |
 |-----------|----------|
 | `desayunos` | Huevos, tostadas, cereal, fruta |
+| `almuerzos` | Platos del mediodía, menú diario |
+| `cenas` | Platos de noche, cena ligera |
 | `snacks` | Patatas, frutos secos, galletas |
 | `bebidas` | Café, refrescos, vino, agua |
 

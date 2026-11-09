@@ -54,7 +54,7 @@ export const reservations = pgTable('reservations', {
 export const products = pgTable('products', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
-  category: text('category', { enum: ['desayunos', 'snacks', 'bebidas'] }).notNull(),
+  category: text('category', { enum: ['desayunos', 'almuerzos', 'cenas', 'snacks', 'bebidas'] }).notNull(),
   price: real('price').notNull(),
   currentStock: integer('current_stock').notNull().default(0),
   minStock: integer('min_stock').notNull().default(0),

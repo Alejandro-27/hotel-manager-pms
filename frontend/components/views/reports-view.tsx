@@ -122,9 +122,20 @@ const salesConfig = {
 
 const pieConfig = {
   desayunos: { label: "Desayunos", color: "var(--chart-1)" },
+  almuerzos: { label: "Almuerzos", color: "var(--chart-4)" },
+  cenas: { label: "Cenas", color: "var(--chart-5)" },
   snacks: { label: "Snacks", color: "var(--chart-2)" },
   bebidas: { label: "Bebidas", color: "var(--chart-3)" },
 } satisfies ChartConfig
+
+const cateringCategories = ['desayunos', 'almuerzos', 'cenas', 'snacks', 'bebidas'] as const
+const cateringColors: Record<string, string> = {
+  desayunos: 'var(--chart-1)',
+  almuerzos: 'var(--chart-4)',
+  cenas: 'var(--chart-5)',
+  snacks: 'var(--chart-2)',
+  bebidas: 'var(--chart-3)',
+}
 
 export function ReportsView() {
   const { user } = useAuth()
@@ -247,10 +258,10 @@ export function ReportsView() {
         agg.set(cat, (agg.get(cat) ?? 0) + item.quantity * item.unitPrice)
       }
     }
-    return ['desayunos', 'snacks', 'bebidas'].map((cat) => ({
+    return cateringCategories.map((cat) => ({
       name: cat,
       value: agg.get(cat) ?? 0,
-      fill: `var(--chart-${['desayunos', 'snacks', 'bebidas'].indexOf(cat) + 1})`,
+      fill: cateringColors[cat],
     }))
   }, [sales, products])
 

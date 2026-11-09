@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cn, formatCurrency, periodRangeLabel, sanitizeDecimalInput, sanitizeIntegerInput, isBlockedNumberKey } from './utils'
+import { cn, formatCurrency, periodRangeLabel, sanitizeDecimalInput, sanitizeIntegerInput, isBlockedNumberKey, cashChange } from './utils'
 import { buildReportSheetRows, reportFileName } from './export-report'
 
 describe('cn', () => {
@@ -144,6 +144,29 @@ describe('sanitizeIntegerInput', () => {
   it('returns empty string when there is no digit', () => {
     expect(sanitizeIntegerInput('')).toBe('')
     expect(sanitizeIntegerInput('abc')).toBe('')
+  })
+})
+
+describe('cashChange', () => {
+  it('calcula el cambio cuando el efectivo supera el total', () => {
+    expect(cashChange(42.5, '50')).toBe(7.5)
+  })
+
+  it('devuelve cero si el efectivo es exacto', () => {
+    expect(cashChange(42.5, '42.5')).toBe(0)
+  })
+
+  it('devuelve negativo si falta efectivo', () => {
+    expect(cashChange(42.5, '40')).toBe(-2.5)
+  })
+
+  it('redondea a dos decimales', () => {
+    expect(cashChange(0.1 + 0.2, '0.6')).toBe(0.3)
+  })
+
+  it('devuelve null si no se indico importe', () => {
+    expect(cashChange(10, '  ')).toBeNull()
+    expect(cashChange(10, 'abc')).toBeNull()
   })
 })
 

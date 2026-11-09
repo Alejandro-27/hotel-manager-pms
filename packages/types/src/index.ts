@@ -39,7 +39,7 @@ export interface Reservation {
 export interface Product {
   id: string
   name: string
-  category: 'desayunos' | 'snacks' | 'bebidas'
+  category: 'desayunos' | 'almuerzos' | 'cenas' | 'snacks' | 'bebidas'
   price: number
   currentStock: number
   minStock: number

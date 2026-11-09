@@ -52,6 +52,8 @@ import {
   Coffee,
   Cookie,
   Wine,
+  Utensils,
+  Moon,
   Package,
   Check,
   AlertCircle,
@@ -68,17 +70,19 @@ import { toast } from "sonner"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth-context"
 import type { Product, Reservation, Guest, Room, SaleItem } from "@/lib/types"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, cashChange } from "@/lib/utils"
 import { NumericInput } from "@/components/ui/numeric-input"
 import { productFormSchema } from "@/lib/validations"
 
-type ProductCategory = "desayunos" | "snacks" | "bebidas"
+type ProductCategory = "desayunos" | "almuerzos" | "cenas" | "snacks" | "bebidas"
 type PaymentMethod = "efectivo" | "tarjeta" | "cargo_habitacion"
 
-const categories: ProductCategory[] = ["desayunos", "snacks", "bebidas"]
+const categories: ProductCategory[] = ["desayunos", "almuerzos", "cenas", "snacks", "bebidas"]
 
 const categoryIcons: Record<ProductCategory, React.ReactNode> = {
   desayunos: <Coffee className="size-4" />,
+  almuerzos: <Utensils className="size-4" />,
+  cenas: <Moon className="size-4" />,
   snacks: <Cookie className="size-4" />,
   bebidas: <Wine className="size-4" />,
 }
@@ -102,6 +106,7 @@ export function PosView() {
   const [activeTab, setActiveTab] = useState("pos")
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | "">("")
   const [selectedRoom, setSelectedRoom] = useState("")
+  const [cashReceived, setCashReceived] = useState("")
   const [charging, setCharging] = useState(false)
 
   const fetchData = useCallback(async () => {
@@ -142,6 +147,14 @@ export function PosView() {
       }))
   }, [reservationsData, guestById, roomById])
 
+  const occupiedRooms = useMemo(
+    () =>
+      activeCheckins
+        .flatMap((ci) => (ci.room && ci.guest ? [{ room: ci.room, guest: ci.guest }] : []))
+        .sort((a, b) => a.room.number.localeCompare(b.room.number)),
+    [activeCheckins]
+  )
+
   const cartTotal = useMemo(() => {
     return cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
   }, [cart])
@@ -178,6 +191,7 @@ export function PosView() {
     setCart([])
     setPaymentMethod("")
     setSelectedRoom("")
+    setCashReceived("")
   }
 
   function handleProductDeleted(id: string) {
@@ -186,6 +200,11 @@ export function PosView() {
 
   async function handleCharge() {
     if (cart.length === 0) return
+    const change = cashChange(cartTotal, cashReceived)
+    if (paymentMethod === "efectivo" && change !== null && change < 0) {
+      setActionError("El efectivo recibido es menor que el total a cobrar")
+      return
+    }
     setCharging(true)
     setActionError(null)
     try {
@@ -263,7 +282,9 @@ export function PosView() {
                 setPaymentMethod={setPaymentMethod}
                 selectedRoom={selectedRoom}
                 setSelectedRoom={setSelectedRoom}
-                activeCheckins={activeCheckins}
+                occupiedRooms={occupiedRooms}
+                cashReceived={cashReceived}
+                setCashReceived={setCashReceived}
                 charging={charging}
                 onUpdateQuantity={updateQuantity}
                 onRemove={removeFromCart}
@@ -369,10 +390,9 @@ function ProductGrid({
 
 // ---------- Cart Sidebar ----------
 
-type ActiveCheckin = {
-  reservation: Reservation
-  guest: Guest | undefined
-  room: Room | undefined
+type ChargeableRoom = {
+  room: Room
+  guest: Guest
 }
 
 function CartSidebar({
@@ -382,7 +402,9 @@ function CartSidebar({
   setPaymentMethod,
   selectedRoom,
   setSelectedRoom,
-  activeCheckins,
+  occupiedRooms,
+  cashReceived,
+  setCashReceived,
   charging,
   onUpdateQuantity,
   onRemove,
@@ -394,13 +416,20 @@ function CartSidebar({
   setPaymentMethod: (m: PaymentMethod | "") => void
   selectedRoom: string
   setSelectedRoom: (r: string) => void
-  activeCheckins: ActiveCheckin[]
+  occupiedRooms: ChargeableRoom[]
+  cashReceived: string
+  setCashReceived: (v: string) => void
   charging: boolean
   onUpdateQuantity: (productId: string, delta: number) => void
   onRemove: (productId: string) => void
   onCharge: () => void
 }) {
-  const canCharge = !!paymentMethod && (paymentMethod !== "cargo_habitacion" || !!selectedRoom)
+  const change = cashChange(cartTotal, cashReceived)
+  const insufficientCash = change !== null && change < 0
+  const canCharge =
+    !!paymentMethod &&
+    (paymentMethod !== "cargo_habitacion" || !!selectedRoom) &&
+    !insufficientCash
 
   return (
     <div className="lg:sticky lg:top-4 h-fit">
@@ -491,7 +520,7 @@ function CartSidebar({
                     variant={paymentMethod === "tarjeta" ? "default" : "outline"}
                     size="sm"
                     className="flex-col h-auto py-2 gap-1"
-                    onClick={() => { setPaymentMethod("tarjeta"); setSelectedRoom("") }}
+                    onClick={() => { setPaymentMethod("tarjeta"); setSelectedRoom(""); setCashReceived("") }}
                   >
                     <CreditCard className="size-4" />
                     <span className="text-[10px]">Tarjeta</span>
@@ -500,7 +529,7 @@ function CartSidebar({
                     variant={paymentMethod === "cargo_habitacion" ? "default" : "outline"}
                     size="sm"
                     className="flex-col h-auto py-2 gap-1"
-                    onClick={() => setPaymentMethod("cargo_habitacion")}
+                    onClick={() => { setPaymentMethod("cargo_habitacion"); setCashReceived("") }}
                   >
                     <BedDouble className="size-4" />
                     <span className="text-[10px]">Habitacion</span>
@@ -508,18 +537,58 @@ function CartSidebar({
                 </div>
 
                 {paymentMethod === "cargo_habitacion" && (
-                  <Select value={selectedRoom} onValueChange={setSelectedRoom}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar habitacion" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {activeCheckins.map((ci) => (
-                        <SelectItem key={ci.reservation.id} value={ci.room?.id ?? ""}>
-                          Hab. {ci.room?.number} - {ci.guest?.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="grid gap-2">
+                    <Select value={selectedRoom} onValueChange={setSelectedRoom}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Seleccionar habitacion ocupada" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {occupiedRooms.length === 0 ? (
+                          <SelectItem value="none" disabled>
+                            No hay habitaciones ocupadas
+                          </SelectItem>
+                        ) : (
+                          occupiedRooms.map(({ room, guest }) => (
+                            <SelectItem key={room.id} value={room.id}>
+                              Hab. {room.number} - {guest.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[11px] text-muted-foreground">
+                      El cargo se suma a la factura en curso del huesped.
+                    </p>
+                  </div>
+                )}
+
+                {paymentMethod === "efectivo" && (
+                  <div className="grid gap-2">
+                    <Label htmlFor="cash-received" className="text-xs text-muted-foreground">
+                      Efectivo recibido
+                    </Label>
+                    <NumericInput
+                      id="cash-received"
+                      mode="decimal"
+                      min="0"
+                      step="0.01"
+                      value={cashReceived}
+                      onValueChange={setCashReceived}
+                      placeholder="Importe entregado"
+                    />
+                    {change !== null && (
+                      <div
+                        className={`flex items-center justify-between rounded-md px-3 py-2 text-sm ${
+                          insufficientCash
+                            ? "bg-destructive/10 text-destructive"
+                            : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                        }`}
+                      >
+                        <span>{insufficientCash ? "Falta" : "Cambio"}</span>
+                        <span className="font-semibold">{formatCurrency(Math.abs(change))}</span>
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 <Button

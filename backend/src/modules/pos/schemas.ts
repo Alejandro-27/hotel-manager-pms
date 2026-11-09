@@ -2,7 +2,7 @@ import { z } from 'zod/v4'
 
 export const createProductSchema = z.object({
   name: z.string().min(2, 'Nombre requerido'),
-  category: z.enum(['desayunos', 'snacks', 'bebidas']),
+  category: z.enum(['desayunos', 'almuerzos', 'cenas', 'snacks', 'bebidas']),
   price: z.number().nonnegative(),
   currentStock: z.number().int().min(0).default(0),
   minStock: z.number().int().min(0).default(0),
@@ -11,7 +11,7 @@ export const createProductSchema = z.object({
 
 export const updateProductSchema = z.object({
   name: z.string().min(2, 'Nombre requerido').optional(),
-  category: z.enum(['desayunos', 'snacks', 'bebidas']).optional(),
+  category: z.enum(['desayunos', 'almuerzos', 'cenas', 'snacks', 'bebidas']).optional(),
   price: z.number().nonnegative().optional(),
   currentStock: z.number().int().min(0).optional(),
   minStock: z.number().int().min(0).optional(),
@@ -45,7 +45,7 @@ export type UpdateStockInput = z.infer<typeof updateStockSchema>
 export type CreateSaleInput = z.infer<typeof createSaleSchema>
 
 export const listProductsQuerySchema = z.object({
-  category: z.enum(['desayunos', 'snacks', 'bebidas']).optional(),
+  category: z.enum(['desayunos', 'almuerzos', 'cenas', 'snacks', 'bebidas']).optional(),
 })
 
 export const listSalesQuerySchema = z.object({

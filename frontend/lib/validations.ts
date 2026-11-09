@@ -47,7 +47,7 @@ export type ReservationFormData = z.infer<typeof reservationSchema>
 
 export const productFormSchema = z.object({
   name: z.string().trim().min(2, 'Introduce un nombre válido (mínimo 2 caracteres)'),
-  category: z.enum(['desayunos', 'snacks', 'bebidas']),
+  category: z.enum(['desayunos', 'almuerzos', 'cenas', 'snacks', 'bebidas']),
   price: z.string().refine(
     (v) => v.trim() !== '' && !Number.isNaN(Number(v)) && Number(v) >= 0,
     'Introduce un precio válido'

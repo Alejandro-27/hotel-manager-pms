@@ -1,0 +1,6 @@
+name = "hotel-manager-frontend"
+compatibility_date = "2026-11-10"
+
+[build]
+command = "pnpm run build:pages"
+publish = ".next"

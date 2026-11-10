@@ -8,6 +8,7 @@ allowBuilds:
   esbuild: true
   sharp: true
   unrs-resolver: true
+  workerd: set this to true or false
 
 minimumReleaseAgeExclude:
   - baseline-browser-mapping@2.11.27

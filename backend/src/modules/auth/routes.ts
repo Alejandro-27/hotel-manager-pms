@@ -16,9 +16,11 @@ import { registerSchema, loginSchema, updateProfileSchema, changePasswordSchema 
 import type { AuthUser } from '../../plugins/auth.js'
 import { env, jwtAccessTtlSeconds, jwtRefreshTtlSeconds } from '../../config/env.js'
 
+const sameSite: 'none' | 'lax' = env.nodeEnv === 'production' ? 'none' : 'lax'
+
 const accessCookie = {
   httpOnly: true,
-  sameSite: (env.nodeEnv === 'production' ? 'none' : 'lax') as const,
+  sameSite,
   secure: env.nodeEnv === 'production',
   path: '/',
   maxAge: jwtAccessTtlSeconds,
@@ -26,7 +28,7 @@ const accessCookie = {
 
 const refreshCookie = {
   httpOnly: true,
-  sameSite: (env.nodeEnv === 'production' ? 'none' : 'lax') as const,
+  sameSite,
   secure: env.nodeEnv === 'production',
   path: '/api/auth',
   maxAge: jwtRefreshTtlSeconds,

@@ -1,0 +1,27 @@
+name: Wake Render
+
+on:
+  schedule:
+    # Render duerme los servicios gratis tras 15 min de inactividad;
+    # un ping cada 14 min los mantiene despiertos.
+    - cron: "*/14 * * * *"
+  workflow_dispatch:
+
+jobs:
+  wake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Despertar frontend (web)
+        if: ${{ secrets.RENDER_URL != '' }}
+        run: |
+          code=$(curl -o /dev/null -s -w "%{http_code}" --max-time 30 "${{ secrets.RENDER_URL }}")
+          echo "frontend -> $code"
+          test "$code" -ge 200 && test "$code" -lt 300
+
+      - name: Despertar backend (API)
+        if: ${{ secrets.RENDER_API_URL != '' }}
+        run: |
+          code=$(curl -o /dev/null -s -w "%{http_code}" --max-time 30 "${{ secrets.RENDER_API_URL }}")
+          echo "backend -> $code"
+          test "$code" -ge 200 && test "$code" -lt 300

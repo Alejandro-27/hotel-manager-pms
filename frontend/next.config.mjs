@@ -25,6 +25,7 @@ const contentSecurityPolicy = [
 
 const nextConfig = {
   poweredByHeader: false,
+  output: 'export',
   images: {
     unoptimized: true,
   },

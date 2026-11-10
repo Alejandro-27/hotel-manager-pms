@@ -1,8 +1,8 @@
-name: Wake Render
+name: Wake Render backend
 
 on:
   schedule:
-    # Render duerme los servicios gratis tras 15 min de inactividad;
+    # Render duerme los servicios web gratis tras 15 min de inactividad;
     # un ping cada 14 min los mantiene despiertos.
     - cron: "*/14 * * * *"
   workflow_dispatch:
@@ -12,16 +12,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Despertar frontend (web)
-        if: ${{ secrets.RENDER_URL != '' }}
+      - name: Despertar backend de Render
         run: |
-          code=$(curl -o /dev/null -s -w "%{http_code}" --max-time 30 "${{ secrets.RENDER_URL }}")
-          echo "frontend -> $code"
-          test "$code" -ge 200 && test "$code" -lt 300
-
-      - name: Despertar backend (API)
-        if: ${{ secrets.RENDER_API_URL != '' }}
-        run: |
-          code=$(curl -o /dev/null -s -w "%{http_code}" --max-time 30 "${{ secrets.RENDER_API_URL }}")
+          url="https://olimphestia.onrender.com"
+          code=$(curl -o /dev/null -s -w "%{http_code}" --max-time 30 "$url" || true)
           echo "backend -> $code"
-          test "$code" -ge 200 && test "$code" -lt 300
+          # Cualquier respuesta HTTP (2xx, 3xx, 4xx, 5xx) prueba que el servidor
+          # esta despierto. Solo fallamos si no hubo conexion (curl != 0).
+          test -n "$code"

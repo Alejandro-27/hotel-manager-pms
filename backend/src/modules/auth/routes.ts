@@ -18,7 +18,7 @@ import { env, jwtAccessTtlSeconds, jwtRefreshTtlSeconds } from '../../config/env
 
 const accessCookie = {
   httpOnly: true,
-  sameSite: 'lax' as const,
+  sameSite: (env.nodeEnv === 'production' ? 'none' : 'lax') as const,
   secure: env.nodeEnv === 'production',
   path: '/',
   maxAge: jwtAccessTtlSeconds,
@@ -26,7 +26,7 @@ const accessCookie = {
 
 const refreshCookie = {
   httpOnly: true,
-  sameSite: 'lax' as const,
+  sameSite: (env.nodeEnv === 'production' ? 'none' : 'lax') as const,
   secure: env.nodeEnv === 'production',
   path: '/api/auth',
   maxAge: jwtRefreshTtlSeconds,

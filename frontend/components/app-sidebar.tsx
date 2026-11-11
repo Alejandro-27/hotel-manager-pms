@@ -13,6 +13,7 @@ import {
   Hotel,
   LogOut,
   Scale,
+  ShieldAlert,
 } from "lucide-react"
 import {
   Sidebar,
@@ -56,10 +57,11 @@ interface AppSidebarProps {
   onNavigate: (view: string) => void
   userName?: string
   userEmail?: string
+  userRole?: string
   onLogout?: () => void
 }
 
-export function AppSidebar({ activeView, onNavigate, userName, userEmail, onLogout }: AppSidebarProps) {
+export function AppSidebar({ activeView, onNavigate, userName, userEmail, userRole, onLogout }: AppSidebarProps) {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="px-3 py-4">
@@ -130,6 +132,35 @@ export function AppSidebar({ activeView, onNavigate, userName, userEmail, onLogo
           </SidebarGroup>
         </Collapsible>
 
+        {userRole === "admin" && (
+          <Collapsible defaultOpen className="group/collapsible">
+            <SidebarGroup>
+              <SidebarGroupLabel asChild>
+                <CollapsibleTrigger className="flex w-full items-center">
+                  Administración del Sistema
+                  <ChevronDown className="ml-auto size-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                </CollapsibleTrigger>
+              </SidebarGroupLabel>
+              <CollapsibleContent>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        isActive={activeView === "adminRequests"}
+                      aria-current={activeView === "adminRequests" ? "page" : undefined}
+                        onClick={() => onNavigate("adminRequests")}
+                        tooltip="Solicitudes de cuenta"
+                      >
+                        <ShieldAlert className="mr-2 size-4" />
+                        <span>Solicitudes de cuenta</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </CollapsibleContent>
+            </SidebarGroup>
+          </Collapsible>
+        )}
         <Collapsible defaultOpen className="group/collapsible">
           <SidebarGroup>
             <SidebarGroupLabel asChild>

@@ -17,6 +17,7 @@ import { BillingView } from "@/components/views/billing-view"
 import { RoomsView } from "@/components/views/rooms-view"
 import { SettingsView } from "@/components/views/settings-view"
 import { ReportsView } from "@/components/views/reports-view"
+import { AdminRequestsView } from "@/components/views/admin-requests-view"
 import { AuthScreen } from "@/components/auth-screen"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useAuth } from "@/lib/auth-context"
@@ -37,6 +38,7 @@ const viewTitles: Record<string, string> = {
   rooms: "Gestion de Habitaciones",
   settings: "Configuracion",
   reports: "Informes y KPIs",
+  adminRequests: "Solicitudes de cuenta",
 }
 
 export default function Page() {
@@ -73,6 +75,7 @@ export default function Page() {
         onNavigate={setActiveView}
         userName={user.name}
         userEmail={user.email}
+        userRole={user.role}
         onLogout={logout}
       />
       <SidebarInset>
@@ -106,6 +109,7 @@ export default function Page() {
           {activeView === "rooms" && <RoomsView />}
           {activeView === "settings" && <SettingsView />}
           {activeView === "reports" && <ReportsView />}
+          {activeView === "adminRequests" && <AdminRequestsView />}
 
           <footer className="mt-8 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 border-t pt-4 text-xs text-muted-foreground">
             <span>&copy; {new Date().getFullYear()} {user.tenantName?.trim() || "HotelManager"}</span>

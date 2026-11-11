@@ -53,12 +53,12 @@ Documento de **estado dinámico** del proyecto. Complementa a `AGENTS.md` (conve
 - **Textos UI en español sin acentos** (ej. "Ocupacion", "Ultimo ano"); excepción: content editable libre.
 - **Browser bridge roto** → no hay verificación visual automatizada; el usuario revisa en `pnpm dev`. Verificar con `tsc --noEmit` + `pnpm lint` + tests + `pnpm build`.
 - `frontend/next-env.d.ts` es auto-generado: **revertir con `git checkout --`** antes de commitear si el build lo toca.
-- GitHub Actions corre lint+typecheck+build+tests (frontend) y build+tests (backend contra PostgreSQL 16); `wake-render.yml` hace ping a Render cada 14 min para que el servicio gratis no se duerme (URLs en secretos `RENDER_URL` / `RENDER_API_URL`).
+- GitHub Actions corre lint+typecheck+build+tests (frontend) y build+tests (backend contra PostgreSQL 16). El backend en Render se mantiene despierto con un cron externo (cron-job.org) que hace `GET https://olimphestia.onrender.com` cada 5 min para evitar el spin-down del plan gratis.
 - Credenciales test backend: `admin@test.com` / `Password123!` (BD `hotel_manager_test`).
 
 ## Log de cambios recientes (podar lo viejo)
 
-- (sin commit) ci: workflow `wake-render.yml` que hace ping a Render cada 14 min para que el servicio gratis no se duerme; URLs en secretos `RENDER_URL` / `RENDER_API_URL`
+- (sin commit) ci: eliminado workflow `wake-render.yml` de GitHub Actions; ahora el backend de Render se despierta con cron-job.org (`GET` a `https://olimphestia.onrender.com` cada 5 min)
 - (sin commit) habitaciones: ocupacion derivada de reservas (checkOut > hoy, liberacion al terminar), huesped actual en Gestion de Habitaciones y bloqueo de documento/email/telefono duplicados; efectivo recibido con cambio en anticipo de reserva y pago de factura
 - feat(ui): buscador de pais por nombre en reservas y edicion de huesped (`CountryCombobox` con cmdk y filtro sin acentos)
 - `84c6f75` feat(tpv): seleccion de habitacion ocupada al cargar productos, calculo de cambio en efectivo y categorias `almuerzos`/`cenas`

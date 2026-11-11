@@ -14,9 +14,9 @@ Documento de **estado dinámico** del proyecto. Complementa a `AGENTS.md` (conve
 
 ## Snapshot actual
 
-- Fecha: 2026-11-09 · Rama: `main` · Último commit: buscador de pais por nombre en reservas y huespedes
-- **Pendiente de commit**: ocupacion derivada de reservas, estado manual en Gestion de Habitaciones, huesped actual y validacion de duplicados (documento/email/telefono).
-- Código fuente: `tsc` limpio en frontend y backend; lint frontend 0 errores / 6 warnings (baseline); `pnpm test` **71/71**; `pnpm test:api` **35/35**; `pnpm build` OK (Next 16.3.8).
+- Fecha: 2026-11-11 · Rama: `main` · Último commit: multitenant por hotel con aprobación de cuentas
+- **Pendiente**: aplicar migración `0006_tenant_isolation.sql` a PostgreSQL de Render y local; ejecutar `pnpm test:api` contra BD real
+- Código fuente: `tsc` limpio en frontend y backend; `pnpm test` **71/71** frontend OK; backend no ejecutable sin PostgreSQL local
 - **Auditoría de dependencias**: `pnpm audit --prod` → 0 vulnerabilidades. En dev queda 1 moderada (`esbuild@0.18.20` vía `drizzle-kit`/`@esbuild-kit`; solo afecta al dev-server de esbuild, no se usa así). Resuelto con `overrides` en `pnpm-workspace.yaml` (pnpm v12 ya no lee `pnpm.overrides` de `package.json`).
 - Revertidos los cambios **visuales** de la auditoría de 7 fases a petición del usuario: la estética previa queda intacta. Se conserva la funcionalidad (legal, settings, consentimientos) y atributos sin impacto (`aria-*`, foco).
 - Browser bridge roto → verificación visual manual en `pnpm dev` (pendiente comprobar la CSP de producción, que solo aplica con `next build && next start`).
@@ -31,6 +31,9 @@ Documento de **estado dinámico** del proyecto. Complementa a `AGENTS.md` (conve
 
 ## Decisiones recientes (con su porqué)
 
+- **Multitenant por hotel**: nueva tabla `tenants`; todas las tablas de negocio tienen `tenant_id` NOT NULL. Usuarios nacen como `pendiente` (sin rol, sin tenant); el admin del sistema los aprueba y les asigna hotel + rol. La recepción solo la crea el admin dentro de su hotel. Cada consulta filtra por `tenant_id` del usuario autenticado.
+- **Aprobación manual obligatoria**: no hay bootstrap automático. El primer usuario debe ser aprobado manualmente por el dueño del sistema desde `/api/auth/pending-requests`.
+- **Índices de optimización**: índices compuestos `(tenant_id, status/date/category/etc.)` en todas las tablas de negocio para evitar saturación de Render.
 - **Ocupacion derivada de reservas**: `getOccupiedRoomIds()` considera vigente toda reserva `confirmada`/`checkin` con `checkOut > hoy` (incluye futuras); `listRooms()` superpone `ocupada` sobre el estado guardado salvo `mantenimiento`/`limpieza`. Al pasar el check-out la habitacion se libera sola, sin escrituras ni jobs. `rooms-view` muestra el huesped de la reserva vigente y permite cambiar el estado guardado.
 - **Cambio en efectivo**: helper `cashChange(total, received)` en `lib/utils.ts`; se muestra en TPV, anticipo de reserva y pago de factura, y bloquea el cobro si el efectivo no llega.
 - **Sesiones refresh server-side** (`refresh_sessions`) con rotación obligatoria: cada `/api/auth/refresh` invalida el token usado y emite uno nuevo; logout y cambio de contraseña revocan todas. Cierra el agujero de refresh no revocable. El `jti` va **en el payload** (los tipos de `@fastify/jwt` no aceptan la opción `jwtid`).
@@ -58,6 +61,7 @@ Documento de **estado dinámico** del proyecto. Complementa a `AGENTS.md` (conve
 
 ## Log de cambios recientes (podar lo viejo)
 
+- `8812eba` feat(multitenant): tenants por hotel, aprobación manual de cuentas, rol pendiente por defecto, tenant_id en todas las tablas, índices optimizados, endpoints de administración de solicitudes y recepciones
 - (sin commit) ci: eliminado workflow `wake-render.yml` de GitHub Actions; ahora el backend de Render se despierta con cron-job.org (`GET` a `https://olimphestia.onrender.com` cada 5 min)
 - (sin commit) habitaciones: ocupacion derivada de reservas (checkOut > hoy, liberacion al terminar), huesped actual en Gestion de Habitaciones y bloqueo de documento/email/telefono duplicados; efectivo recibido con cambio en anticipo de reserva y pago de factura
 - feat(ui): buscador de pais por nombre en reservas y edicion de huesped (`CountryCombobox` con cmdk y filtro sin acentos)

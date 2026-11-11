@@ -14,9 +14,10 @@ Documento de **estado dinámico** del proyecto. Complementa a `AGENTS.md` (conve
 
 ## Snapshot actual
 
-- Fecha: 2026-11-11 · Rama: `main` · Último commit: multitenant por hotel con aprobación de cuentas
+- Fecha: 2026-11-11 · Rama: `main` · Último commit: vista de administración de solicitudes en frontend
 - **Pendiente**: aplicar migración `0006_tenant_isolation.sql` a PostgreSQL de Render y local; ejecutar `pnpm test:api` contra BD real
-- Código fuente: `tsc` limpio en frontend y backend; `pnpm test` **71/71** frontend OK; backend no ejecutable sin PostgreSQL local
+- Código fuente: `tsc` limpio en frontend y backend; `pnpm test` **71/71** frontend OK
+- Frontend: nueva vista AdminRequestsView para aprobar/rechazar cuentas pendientes; sidebar con sección Administración del Sistema (solo admin)
 - **Auditoría de dependencias**: `pnpm audit --prod` → 0 vulnerabilidades. En dev queda 1 moderada (`esbuild@0.18.20` vía `drizzle-kit`/`@esbuild-kit`; solo afecta al dev-server de esbuild, no se usa así). Resuelto con `overrides` en `pnpm-workspace.yaml` (pnpm v12 ya no lee `pnpm.overrides` de `package.json`).
 - Revertidos los cambios **visuales** de la auditoría de 7 fases a petición del usuario: la estética previa queda intacta. Se conserva la funcionalidad (legal, settings, consentimientos) y atributos sin impacto (`aria-*`, foco).
 - Browser bridge roto → verificación visual manual en `pnpm dev` (pendiente comprobar la CSP de producción, que solo aplica con `next build && next start`).

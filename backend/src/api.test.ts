@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import type { FastifyInstance } from 'fastify'
+import { eq } from 'drizzle-orm'
 import { buildApp } from './app.js'
+import { db } from './db/index.js'
+import { users } from './db/schema.js'
 
 let app: FastifyInstance
 
@@ -13,14 +16,22 @@ afterAll(async () => {
   await app.close()
 })
 
-async function registerUser(email: string, name = 'Usuario Test'): Promise<string> {
+async function registerUser(email: string, name = 'Usuario Test', role: 'admin' | 'recepcion' = 'recepcion'): Promise<string> {
   const res = await app.inject({
     method: 'POST',
     url: '/api/auth/register',
     payload: { name, email, password: 'Password123!', acceptTerms: true },
   })
   expect(res.statusCode).toBe(201)
-  return res.cookies.find((cookie) => cookie.name === 'token')?.value ?? ''
+  // Activar el usuario directamente para poder hacer login en los tests
+  await db.update(users).set({ role, status: 'activo', tenantId: 'tenant_default' }).where(eq(users.email, email))
+  const loginRes = await app.inject({
+    method: 'POST',
+    url: '/api/auth/login',
+    payload: { email, password: 'Password123!' },
+  })
+  expect(loginRes.statusCode).toBe(200)
+  return loginRes.cookies.find((cookie) => cookie.name === 'token')?.value ?? ''
 }
 
 async function loginAsAdmin(): Promise<string> {
@@ -353,11 +364,10 @@ describe('auth profile y password', () => {
       method: 'PATCH',
       url: '/api/auth/profile',
       headers: { authorization: `Bearer ${token}` },
-      payload: { name: 'Nombre Nuevo', hotelName: 'Hotel Test' },
+      payload: { name: 'Nombre Nuevo' },
     })
     expect(res.statusCode).toBe(200)
     expect(res.json().name).toBe('Nombre Nuevo')
-    expect(res.json().hotelName).toBe('Hotel Test')
   })
 
   it('rechaza contrasena actual incorrecta', async () => {

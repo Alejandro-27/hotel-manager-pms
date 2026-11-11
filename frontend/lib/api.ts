@@ -16,13 +16,53 @@ export interface AuthUser {
   id: string
   name: string
   email: string
-  role: 'admin' | 'recepcion'
-  hotelName: string | null
+  role: 'pendiente' | 'admin' | 'recepcion'
+  status: string
+  tenantId: string | null
+  tenantName: string | null
   termsAcceptedAt?: string | null
 }
 
 export interface AuthResponse {
   user: AuthUser
+}
+
+export interface PendingRequest {
+  id: string
+  name: string
+  email: string
+  role: string
+  status: string
+  createdAt: string
+  tenantId: string | null
+  tenantName: string | null
+}
+
+export interface TenantInfo {
+  id: string
+  name: string
+  slug: string
+}
+
+export interface ApproveRequestInput {
+  userId: string
+  role: 'admin' | 'recepcion'
+  tenantId: string
+}
+
+export interface RejectRequestInput {
+  userId: string
+}
+
+export interface CreateTenantInput {
+  name: string
+  slug: string
+}
+
+export interface CreateRecepcionInput {
+  name: string
+  email: string
+  password: string
 }
 
 export interface DashboardReport {
@@ -137,6 +177,31 @@ export const api = {
       request<AuthUser>('/api/auth/profile', { method: 'PATCH', body: JSON.stringify(data) }),
     changePassword: (data: { currentPassword: string; newPassword: string }) =>
       request<{ ok: boolean }>('/api/auth/password', { method: 'POST', body: JSON.stringify(data) }),
+
+    /* ---------- Administración de solicitudes y tenants ---------- */
+
+    pendingRequests: () => request<{ requests: PendingRequest[] }>('/api/auth/pending-requests'),
+    approveRequest: (input: ApproveRequestInput) =>
+      request<{ user: AuthUser }>(
+        `/api/auth/pending-requests/${input.userId}/approve`,
+        { method: 'PATCH', body: JSON.stringify(input) },
+      ),
+    rejectRequest: (input: RejectRequestInput) =>
+      request<{ ok: boolean }>(
+        `/api/auth/pending-requests/${input.userId}/reject`,
+        { method: 'PATCH', body: JSON.stringify(input) },
+      ),
+    tenants: () => request<{ tenants: TenantInfo[] }>('/api/auth/tenants'),
+    createTenant: (input: CreateTenantInput) =>
+      request<{ id: string; name: string; slug: string }>(
+        '/api/auth/tenants',
+        { method: 'POST', body: JSON.stringify(input) },
+      ),
+    createRecepcion: (input: CreateRecepcionInput) =>
+      request<{ user: AuthUser }>('/api/auth/recepcion', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
   },
 
   rooms: {

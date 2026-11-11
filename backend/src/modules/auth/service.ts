@@ -1,10 +1,9 @@
 import { randomUUID } from 'node:crypto'
-import { eq, sql } from 'drizzle-orm'
+import { asc, eq, sql } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 import { db } from '../../db/index.js'
-import { refreshSessions, users } from '../../db/schema.js'
+import { refreshSessions, tenants, users } from '../../db/schema.js'
 import { AppError } from '../../plugins/error-handler.js'
-import { isRegistrationAllowed } from '../../config/env.js'
 import type { LoginInput, RegisterInput, UpdateProfileInput } from './schemas.js'
 import type { AuthUser } from '../../plugins/auth.js'
 
@@ -13,7 +12,9 @@ export interface PublicUser {
   name: string
   email: string
   role: string
-  hotelName: string | null
+  status: string
+  tenantId: string | null
+  tenantName: string | null
   termsAcceptedAt: string | null
 }
 
@@ -28,7 +29,9 @@ function toPublicUser(u: {
   name: string
   email: string
   role: string
-  hotelName: string | null
+  status: string
+  tenantId: string | null
+  tenantName: string | null
   termsAcceptedAt: string | null
 }): PublicUser {
   return {
@@ -36,7 +39,9 @@ function toPublicUser(u: {
     name: u.name,
     email: u.email,
     role: u.role,
-    hotelName: u.hotelName,
+    status: u.status,
+    tenantId: u.tenantId,
+    tenantName: u.tenantName,
     termsAcceptedAt: u.termsAcceptedAt,
   }
 }
@@ -54,13 +59,6 @@ export async function register(input: RegisterInput): Promise<PublicUser> {
     throw new AppError(409, 'El email ya está registrado')
   }
 
-  const userCount = await db.select({ count: sql<number>`count(*)` }).from(users)
-  const isFirstUser = Number(userCount[0]?.count ?? 0) === 0
-
-  if (!isFirstUser && !isRegistrationAllowed()) {
-    throw new AppError(403, 'El registro público está deshabilitado')
-  }
-
   const passwordHash = await bcrypt.hash(input.password, 10)
   const now = new Date().toISOString()
   const userId = randomUUID()
@@ -70,9 +68,11 @@ export async function register(input: RegisterInput): Promise<PublicUser> {
     name: input.name,
     email: input.email,
     passwordHash,
-    role: isFirstUser ? 'admin' : 'recepcion',
-    hotelName: input.hotelName ?? null,
-    termsAcceptedAt: now,
+    role: 'pendiente',
+    status: 'pendiente',
+    tenantId: null,
+    invitedBy: null,
+    termsAcceptedAt: input.acceptTerms ? now : null,
     createdAt: now,
     updatedAt: now,
   })
@@ -80,7 +80,16 @@ export async function register(input: RegisterInput): Promise<PublicUser> {
   const created = (await db.select().from(users).where(eq(users.id, userId)).limit(1))[0]
   if (!created) throw new AppError(500, 'Error creando usuario')
 
-  return toPublicUser(created)
+  return toPublicUser({
+    id: created.id,
+    name: created.name,
+    email: created.email,
+    role: created.role,
+    status: created.status,
+    tenantId: created.tenantId,
+    tenantName: null,
+    termsAcceptedAt: created.termsAcceptedAt,
+  })
 }
 
 export async function login(input: LoginInput): Promise<PublicUser> {
@@ -106,23 +115,64 @@ export async function login(input: LoginInput): Promise<PublicUser> {
     throw new AppError(401, 'Credenciales inválidas')
   }
 
+  if (user.status !== 'activo') {
+    throw new AppError(403, 'Su cuenta está pendiente de aprobación por el administrador')
+  }
+
   loginAttempts.delete(key)
-  return toPublicUser(user)
+
+  const tenantName = user.tenantId
+    ? (await db.select({ name: tenants.name }).from(tenants).where(eq(tenants.id, user.tenantId)).limit(1))[0]?.name ?? null
+    : null
+
+  return toPublicUser({
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    status: user.status,
+    tenantId: user.tenantId,
+    tenantName,
+    termsAcceptedAt: user.termsAcceptedAt,
+  })
 }
 
-export function buildAuthUser(user: { id: string; name: string; email: string; role: string }): AuthUser {
+export function buildAuthUser(user: {
+  id: string
+  name: string
+  email: string
+  role: string
+  status: string
+  tenantId: string | null
+}): AuthUser {
   return {
     sub: user.id,
     email: user.email,
     name: user.name,
     role: user.role,
+    status: user.status,
+    tenantId: user.tenantId,
   }
 }
 
 export async function getMe(userId: string): Promise<PublicUser> {
   const user = (await db.select().from(users).where(eq(users.id, userId)).limit(1))[0]
   if (!user) throw new AppError(404, 'Usuario no encontrado')
-  return toPublicUser(user)
+
+  const tenantName = user.tenantId
+    ? (await db.select({ name: tenants.name }).from(tenants).where(eq(tenants.id, user.tenantId)).limit(1))[0]?.name ?? null
+    : null
+
+  return toPublicUser({
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    status: user.status,
+    tenantId: user.tenantId,
+    tenantName,
+    termsAcceptedAt: user.termsAcceptedAt,
+  })
 }
 
 export async function updateProfile(userId: string, input: UpdateProfileInput): Promise<PublicUser> {
@@ -131,13 +181,25 @@ export async function updateProfile(userId: string, input: UpdateProfileInput): 
 
   const changes: Record<string, string | null> = { updatedAt: new Date().toISOString() }
   if (input.name !== undefined) changes.name = input.name
-  if (input.hotelName !== undefined) changes.hotelName = input.hotelName
 
   await db.update(users).set(changes).where(eq(users.id, userId))
   const updated = (await db.select().from(users).where(eq(users.id, userId)).limit(1))[0]
   if (!updated) throw new AppError(500, 'Error actualizando perfil')
 
-  return toPublicUser(updated)
+  const tenantName = updated.tenantId
+    ? (await db.select({ name: tenants.name }).from(tenants).where(eq(tenants.id, updated.tenantId)).limit(1))[0]?.name ?? null
+    : null
+
+  return toPublicUser({
+    id: updated.id,
+    name: updated.name,
+    email: updated.email,
+    role: updated.role,
+    status: updated.status,
+    tenantId: updated.tenantId,
+    tenantName,
+    termsAcceptedAt: updated.termsAcceptedAt,
+  })
 }
 
 export async function changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
@@ -152,10 +214,11 @@ export async function changePassword(userId: string, currentPassword: string, ne
   await revokeAllUserSessions(userId)
 }
 
-export async function createRefreshSession(id: string, userId: string, expiresAt: string): Promise<void> {
+export async function createRefreshSession(id: string, userId: string, tenantId: string | null, expiresAt: string): Promise<void> {
   await db.insert(refreshSessions).values({
     id,
     userId,
+    tenantId: tenantId ?? '',
     createdAt: new Date().toISOString(),
     expiresAt,
     revokedAt: null,
@@ -183,4 +246,100 @@ export async function revokeAllUserSessions(userId: string): Promise<void> {
     .update(refreshSessions)
     .set({ revokedAt: new Date().toISOString() })
     .where(eq(refreshSessions.userId, userId))
+}
+
+/* ---------- Gestión de solicitudes pendientes (admin del sistema) ---------- */
+
+export interface PendingRequest {
+  id: string
+  name: string
+  email: string
+  role: string
+  status: string
+  createdAt: string
+  tenantId: string | null
+  tenantName: string | null
+}
+
+export async function listPendingRequests(): Promise<PendingRequest[]> {
+  const rows = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      role: users.role,
+      status: users.status,
+      createdAt: users.createdAt,
+      tenantId: users.tenantId,
+      tenantName: tenants.name,
+    })
+    .from(users)
+    .leftJoin(tenants, eq(users.tenantId, tenants.id))
+    .where(eq(users.status, 'pendiente'))
+    .orderBy(asc(users.createdAt))
+
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    email: r.email,
+    role: r.role,
+    status: r.status,
+    createdAt: r.createdAt,
+    tenantId: r.tenantId,
+    tenantName: r.tenantName,
+  }))
+}
+
+export interface ApproveRequestInput {
+  userId: string
+  role: 'admin' | 'recepcion'
+  tenantId: string
+}
+
+export async function approveRequest(input: ApproveRequestInput): Promise<PublicUser> {
+  const user = (await db.select().from(users).where(eq(users.id, input.userId)).limit(1))[0]
+  if (!user) throw new AppError(404, 'Usuario no encontrado')
+  if (user.status !== 'pendiente') {
+    throw new AppError(400, 'El usuario ya no está pendiente de aprobación')
+  }
+
+  const tenant = (await db.select().from(tenants).where(eq(tenants.id, input.tenantId)).limit(1))[0]
+  if (!tenant) throw new AppError(404, 'Hotel no encontrado')
+
+  const now = new Date().toISOString()
+  await db.update(users).set({
+    role: input.role,
+    status: 'activo',
+    tenantId: input.tenantId,
+    updatedAt: now,
+  }).where(eq(users.id, input.userId))
+
+  const updated = (await db.select().from(users).where(eq(users.id, input.userId)).limit(1))[0]!
+  return toPublicUser({
+    id: updated.id,
+    name: updated.name,
+    email: updated.email,
+    role: updated.role,
+    status: updated.status,
+    tenantId: updated.tenantId,
+    tenantName: tenant.name,
+    termsAcceptedAt: updated.termsAcceptedAt,
+  })
+}
+
+export async function rejectRequest(userId: string): Promise<void> {
+  const user = (await db.select().from(users).where(eq(users.id, userId)).limit(1))[0]
+  if (!user) throw new AppError(404, 'Usuario no encontrado')
+  if (user.status !== 'pendiente') {
+    throw new AppError(400, 'El usuario ya no está pendiente de aprobación')
+  }
+
+  await db.update(users).set({
+    status: 'rechazado',
+    updatedAt: new Date().toISOString(),
+  }).where(eq(users.id, userId))
+}
+
+export async function listTenants(): Promise<{ id: string; name: string; slug: string }[]> {
+  return db.select({ id: tenants.id, name: tenants.name, slug: tenants.slug }).from(tenants)
 }

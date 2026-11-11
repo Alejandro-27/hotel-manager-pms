@@ -6,14 +6,14 @@ import { updateSettingsSchema } from './schemas.js'
 export default async function settingsRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>()
 
-  typedApp.get('/api/settings', { preHandler: [app.authenticate] }, async () => {
-    return getSettings()
+  typedApp.get('/api/settings', { preHandler: [app.authenticate] }, async (req) => {
+    return getSettings(req.authUser.tenantId!)
   })
 
   typedApp.patch('/api/settings', {
     preHandler: [app.authenticate, app.requireAdmin],
     schema: { body: updateSettingsSchema },
   }, async (req) => {
-    return updateSettings(req.body)
+    return updateSettings(req.authUser.tenantId!, req.body)
   })
 }

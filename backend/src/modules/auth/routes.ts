@@ -1,4 +1,7 @@
 import { randomUUID } from 'node:crypto'
+import { z } from 'zod/v4'
+import bcrypt from 'bcryptjs'
+import { eq } from 'drizzle-orm'
 import type { FastifyInstance, FastifyReply } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import {
@@ -11,10 +14,28 @@ import {
   createRefreshSession,
   rotateRefreshSession,
   revokeRefreshSession,
+  listPendingRequests,
+  approveRequest,
+  rejectRequest,
+  listTenants,
 } from './service.js'
-import { registerSchema, loginSchema, updateProfileSchema, changePasswordSchema } from './schemas.js'
+import {
+  registerSchema,
+  loginSchema,
+  updateProfileSchema,
+  changePasswordSchema,
+  approveRequestSchema,
+  rejectRequestSchema,
+  createTenantSchema,
+  createRecepcionSchema,
+  type CreateTenantInput,
+  type CreateRecepcionInput,
+} from './schemas.js'
 import type { AuthUser } from '../../plugins/auth.js'
 import { env, jwtAccessTtlSeconds, jwtRefreshTtlSeconds } from '../../config/env.js'
+import { db } from '../../db/index.js'
+import { tenants, users } from '../../db/schema.js'
+import { AppError } from '../../plugins/error-handler.js'
 
 const sameSite: 'none' | 'lax' = env.nodeEnv === 'production' ? 'none' : 'lax'
 
@@ -34,28 +55,32 @@ const refreshCookie = {
   maxAge: jwtRefreshTtlSeconds,
 }
 
+const userParamsSchema = z.object({
+  userId: z.string().min(1, 'ID de usuario requerido'),
+})
+
 export default async function authRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>()
 
-  async function issueSession(reply: FastifyReply, user: { id: string; name: string; email: string; role: string }) {
+  async function issueSession(reply: FastifyReply, user: { id: string; name: string; email: string; role: string; status: string; tenantId: string | null }) {
     const token = app.jwt.sign({ ...buildAuthUser(user), type: 'access' })
     const jti = randomUUID()
     const refreshToken = app.jwt.sign(
       { ...buildAuthUser(user), type: 'refresh', jti },
       { expiresIn: env.jwtRefreshExpiresIn }
     )
-    await createRefreshSession(jti, user.id, new Date(Date.now() + jwtRefreshTtlSeconds * 1000).toISOString())
+    await createRefreshSession(jti, user.id, user.tenantId, new Date(Date.now() + jwtRefreshTtlSeconds * 1000).toISOString())
     reply.setCookie('token', token, accessCookie)
     reply.setCookie('refreshToken', refreshToken, refreshCookie)
   }
 
+  // Registro: crea cuenta pendiente, no inicia sesión automáticamente
   typedApp.post('/api/auth/register', {
     config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
     schema: { body: registerSchema },
-  }, async (req, reply) => {
-    const user = await register(req.body)
-    await issueSession(reply, user)
-    reply.code(201).send({ user })
+  }, async (_req, reply) => {
+    const user = await register(_req.body)
+    reply.code(201).send({ user, message: 'Cuenta creada. Está pendiente de aprobación por el administrador.' })
   })
 
   typedApp.post('/api/auth/login', {
@@ -63,7 +88,7 @@ export default async function authRoutes(app: FastifyInstance) {
     schema: { body: loginSchema },
   }, async (req, reply) => {
     const user = await login(req.body)
-    await issueSession(reply, user)
+    await issueSession(reply, { id: user.id, name: user.name, email: user.email, role: user.role, status: user.status, tenantId: user.tenantId })
     reply.send({ user })
   })
 
@@ -94,7 +119,7 @@ export default async function authRoutes(app: FastifyInstance) {
     }
 
     const user = await getMe(payload.sub)
-    await issueSession(reply, user)
+    await issueSession(reply, { id: user.id, name: user.name, email: user.email, role: user.role, status: user.status, tenantId: user.tenantId })
     reply.send({ user })
   })
 
@@ -113,13 +138,13 @@ export default async function authRoutes(app: FastifyInstance) {
     reply.send({ ok: true })
   })
 
-  typedApp.get('/api/auth/me', { preHandler: [app.authenticate] }, async (req, reply) => {
+  typedApp.get('/api/auth/me', { preHandler: [app.requireActive] }, async (req, reply) => {
     const user = await getMe(req.authUser.sub)
     reply.send(user)
   })
 
   typedApp.patch('/api/auth/profile', {
-    preHandler: [app.authenticate],
+    preHandler: [app.requireActive],
     schema: { body: updateProfileSchema },
   }, async (req, reply) => {
     const user = await updateProfile(req.authUser.sub, req.body)
@@ -127,10 +152,112 @@ export default async function authRoutes(app: FastifyInstance) {
   })
 
   typedApp.post('/api/auth/password', {
-    preHandler: [app.authenticate],
+    preHandler: [app.requireActive],
     schema: { body: changePasswordSchema },
   }, async (req, reply) => {
     await changePassword(req.authUser.sub, req.body.currentPassword, req.body.newPassword)
     reply.send({ ok: true })
+  })
+
+  /* ---------- Endpoints de administración del sistema (solo admin aprobado) ---------- */
+
+  typedApp.get('/api/auth/pending-requests', {
+    preHandler: [app.requireAdmin],
+  }, async () => {
+    const requests = await listPendingRequests()
+    return { requests }
+  })
+
+  typedApp.patch('/api/auth/pending-requests/:userId/approve', {
+    preHandler: [app.requireAdmin],
+    schema: { params: userParamsSchema, body: approveRequestSchema },
+  }, async (req, reply) => {
+    const { userId } = req.params as { userId: string }
+    const { role, tenantId } = req.body as { role: 'admin' | 'recepcion'; tenantId: string }
+    const user = await approveRequest({ userId, role, tenantId })
+    reply.send({ user })
+  })
+
+  typedApp.patch('/api/auth/pending-requests/:userId/reject', {
+    preHandler: [app.requireAdmin],
+    schema: { params: userParamsSchema, body: rejectRequestSchema },
+  }, async (req, reply) => {
+    const { userId } = req.params as { userId: string }
+    await rejectRequest(userId)
+    reply.send({ ok: true })
+  })
+
+  typedApp.get('/api/auth/tenants', {
+    preHandler: [app.requireAdmin],
+  }, async () => {
+    const list = await listTenants()
+    return { tenants: list }
+  })
+
+  typedApp.post('/api/auth/tenants', {
+    preHandler: [app.requireAdmin],
+    schema: { body: createTenantSchema },
+  }, async (req, reply) => {
+    const input = req.body as CreateTenantInput
+    const existing = (await db.select().from(tenants).where(eq(tenants.slug, input.slug)).limit(1))[0]
+    if (existing) {
+      throw new AppError(409, 'Ya existe un hotel con ese slug')
+    }
+    const now = new Date().toISOString()
+    const id = randomUUID()
+    await db.insert(tenants).values({ id, name: input.name, slug: input.slug, createdAt: now, updatedAt: now })
+    reply.code(201).send({ id, name: input.name, slug: input.slug })
+  })
+
+  typedApp.post('/api/auth/recepcion', {
+    preHandler: [app.requireAdmin],
+    schema: { body: createRecepcionSchema },
+  }, async (req, reply) => {
+    const { name, email, password } = req.body as CreateRecepcionInput
+    const adminTenantId = req.authUser.tenantId
+    if (!adminTenantId) {
+      throw new AppError(403, 'El administrador no tiene un hotel asignado')
+    }
+
+    const existing = (await db.select().from(users).where(eq(users.email, email)).limit(1))[0]
+    if (existing) {
+      throw new AppError(409, 'El email ya está registrado')
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10)
+    const now = new Date().toISOString()
+    const userId = randomUUID()
+
+    await db.insert(users).values({
+      id: userId,
+      name,
+      email,
+      passwordHash,
+      role: 'recepcion',
+      status: 'activo',
+      tenantId: adminTenantId,
+      invitedBy: req.authUser.sub,
+      termsAcceptedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    })
+
+    const created = (await db.select().from(users).where(eq(users.id, userId)).limit(1))[0]
+    if (!created) throw new AppError(500, 'Error creando recepción')
+
+    const tenantName = (await db.select({ name: tenants.name }).from(tenants).where(eq(tenants.id, adminTenantId)).limit(1))[0]?.name ?? null
+
+    reply.code(201).send({
+      user: {
+        id: created.id,
+        name: created.name,
+        email: created.email,
+        role: created.role,
+        status: created.status,
+        tenantId: created.tenantId,
+        tenantName,
+        termsAcceptedAt: created.termsAcceptedAt,
+      },
+    })
   })
 }

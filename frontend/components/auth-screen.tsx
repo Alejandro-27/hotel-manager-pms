@@ -4,7 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Building2, Eye, EyeOff, ArrowRight, UserPlus, LogIn, AlertCircle, CalendarDays, Receipt, Store, BarChart3 } from "lucide-react"
+import { Building2, Eye, EyeOff, ArrowRight, UserPlus, LogIn, AlertCircle, CalendarDays, Receipt, Store, BarChart3, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
@@ -21,6 +21,7 @@ export function AuthScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loginLoading, setLoginLoading] = useState(false)
   const [registerLoading, setRegisterLoading] = useState(false)
+  const [registerSuccess, setRegisterSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const loginForm = useForm<LoginFormData>({
@@ -30,7 +31,7 @@ export function AuthScreen() {
 
   const registerForm = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { name: "", email: "", hotelName: "", password: "", confirmPassword: "", acceptTerms: false },
+    defaultValues: { name: "", email: "", password: "", confirmPassword: "", acceptTerms: false },
   })
 
   async function handleLogin(data: LoginFormData) {
@@ -48,8 +49,10 @@ export function AuthScreen() {
   async function handleRegister(data: RegisterFormData) {
     setRegisterLoading(true)
     setError(null)
+    setRegisterSuccess(false)
     try {
       await doRegister(data)
+      setRegisterSuccess(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al crear la cuenta")
     } finally {
@@ -288,17 +291,6 @@ export function AuthScreen() {
                           <p className="text-xs text-destructive">{registerForm.formState.errors.name.message}</p>
                         )}
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="reg-hotel" className="text-foreground">Nombre del hotel <span className="text-muted-foreground">(opcional)</span></Label>
-                        <Input
-                          id="reg-hotel"
-                          placeholder="Hotel Sol y Mar"
-                          {...registerForm.register("hotelName")}
-                        />
-                        {registerForm.formState.errors.hotelName && (
-                          <p className="text-xs text-destructive">{registerForm.formState.errors.hotelName.message}</p>
-                        )}
-                      </div>
                     </div>
 
                     <div className="space-y-2">
@@ -386,6 +378,13 @@ export function AuthScreen() {
                         </>
                       )}
                     </Button>
+
+                    {registerSuccess && (
+                      <div className="mt-4 flex items-start gap-2 rounded-md border border-green/30 bg-green/5 p-3 text-sm text-green">
+                        <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                        <span>Cuenta creada correctamente. Está pendiente de aprobación por el administrador.</span>
+                      </div>
+                    )}
 
                     <div className="space-y-2">
                       <div className="flex items-start gap-2 pt-1">

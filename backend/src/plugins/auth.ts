@@ -8,12 +8,15 @@ export interface AuthUser {
   email: string
   name: string
   role: string
+  status: string
+  tenantId: string | null
 }
 
 declare module 'fastify' {
   interface FastifyInstance {
     authenticate: (req: FastifyRequest, reply: FastifyReply) => Promise<void>
     requireAdmin: (req: FastifyRequest, reply: FastifyReply) => Promise<void>
+    requireActive: (req: FastifyRequest, reply: FastifyReply) => Promise<void>
   }
   interface FastifyRequest {
     authUser: AuthUser
@@ -49,14 +52,24 @@ export default fp(async (app) => {
         email: payload.email,
         name: payload.name,
         role: payload.role,
+        status: payload.status,
+        tenantId: payload.tenantId ?? null,
       }
     } catch {
       reply.code(401).send({ error: 'No autorizado' })
     }
   })
 
-  app.decorate('requireAdmin', async (req: FastifyRequest, reply: FastifyReply) => {
+  app.decorate('requireActive', async (req: FastifyRequest, reply: FastifyReply) => {
     await app.authenticate(req, reply)
+    if (reply.sent) return
+    if (req.authUser.status !== 'activo') {
+      reply.code(403).send({ error: 'Cuenta no activada. Espere la aprobación del administrador' })
+    }
+  })
+
+  app.decorate('requireAdmin', async (req: FastifyRequest, reply: FastifyReply) => {
+    await app.requireActive(req, reply)
     if (reply.sent) return
     if (req.authUser.role !== 'admin') {
       reply.code(403).send({ error: 'Requiere rol de administrador' })

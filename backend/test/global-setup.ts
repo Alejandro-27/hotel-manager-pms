@@ -21,21 +21,35 @@ export default async function globalSetup() {
   const db = drizzle(client, { schema })
   await migrate(db, { migrationsFolder: './drizzle' })
 
-  await db.execute(`TRUNCATE users, rooms, guests, reservations, products, sales, invoices, expenses, settings, refresh_sessions RESTART IDENTITY CASCADE`)
+  await db.execute(`TRUNCATE tenants, users, rooms, guests, reservations, products, sales, invoices, expenses, settings, refresh_sessions RESTART IDENTITY CASCADE`)
+
+  const now = new Date().toISOString()
+
+  // Crear tenant por defecto para los tests
+  await db.insert(schema.tenants).values({
+    id: 'tenant_default',
+    name: 'Hotel Test',
+    slug: 'hotel-test',
+    createdAt: now,
+    updatedAt: now,
+  })
 
   const adminHash = await bcrypt.hash('Password123!', 10)
-  const now = new Date().toISOString()
   await db.insert(schema.users).values({
     id: '00000000-0000-0000-0000-000000000001',
     name: 'Test Admin',
     email: 'admin@test.com',
     passwordHash: adminHash,
     role: 'admin',
+    status: 'activo',
+    tenantId: 'tenant_default',
+    invitedBy: null,
+    termsAcceptedAt: now,
     createdAt: now,
     updatedAt: now,
   })
   await db.insert(schema.settings).values({
-    id: 'main',
+    tenantId: 'tenant_default',
     legalName: '',
     taxId: '',
     address: '',

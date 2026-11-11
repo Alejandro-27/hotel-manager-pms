@@ -11,20 +11,20 @@ export default async function billingRoutes(app: FastifyInstance) {
     schema: { querystring: listInvoicesQuerySchema },
   }, async (req) => {
     const { status, guestId } = req.query
-    return listInvoices({ status, guestId })
+    return listInvoices(req.authUser.tenantId!, { status, guestId })
   })
 
   typedApp.get('/api/invoices/:id', {
     preHandler: [app.authenticate],
     schema: { params: invoiceParamsSchema },
   }, async (req) => {
-    return getInvoiceById(req.params.id)
+    return getInvoiceById(req.authUser.tenantId!, req.params.id)
   })
 
   typedApp.post('/api/invoices/:id/pay', {
     preHandler: [app.authenticate],
     schema: { params: invoiceParamsSchema, body: payInvoiceSchema },
   }, async (req) => {
-    return payInvoice(req.params.id, req.body)
+    return payInvoice(req.authUser.tenantId!, req.params.id, req.body)
   })
 }

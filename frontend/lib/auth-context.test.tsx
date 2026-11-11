@@ -22,7 +22,7 @@ beforeEach(() => {
 
 describe('AuthProvider', () => {
   it('carga el usuario al arrancar', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ id: 'u1', name: 'Ana', email: 'a@b.c', role: 'admin', hotelName: null }, 200))
+    mockFetch.mockResolvedValue(jsonResponse({ id: 'u1', name: 'Ana', email: 'a@b.c', role: 'admin', status: 'activo', tenantId: null, tenantName: null }, 200))
     render(
       <AuthProvider>
         <Probe />
@@ -33,7 +33,7 @@ describe('AuthProvider', () => {
   })
 
   it('deja sin sesion si el evento session-expired se dispara', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ id: 'u1', name: 'Ana', email: 'a@b.c', role: 'admin', hotelName: null }, 200))
+    mockFetch.mockResolvedValue(jsonResponse({ id: 'u1', name: 'Ana', email: 'a@b.c', role: 'admin', status: 'activo', tenantId: null, tenantName: null }, 200))
     render(
       <AuthProvider>
         <Probe />

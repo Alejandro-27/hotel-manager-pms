@@ -1,12 +1,23 @@
 import { pgTable, text, integer, real, jsonb, boolean } from 'drizzle-orm/pg-core'
+import { sql } from 'drizzle-orm'
+
+export const tenants = pgTable('tenants', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  slug: text('slug').notNull().unique(),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+})
 
 export const users = pgTable('users', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   email: text('email').notNull().unique(),
   passwordHash: text('password_hash').notNull(),
-  role: text('role', { enum: ['admin', 'recepcion', 'catering', 'contabilidad'] }).notNull().default('recepcion'),
-  hotelName: text('hotel_name'),
+  role: text('role', { enum: ['pendiente', 'admin', 'recepcion'] }).notNull().default('pendiente'),
+  status: text('status', { enum: ['pendiente', 'activo', 'rechazado', 'suspendido'] }).notNull().default('pendiente'),
+  tenantId: text('tenant_id').references(() => tenants.id),
+  invitedBy: text('invited_by'),
   termsAcceptedAt: text('terms_accepted_at'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
@@ -14,7 +25,8 @@ export const users = pgTable('users', {
 
 export const rooms = pgTable('rooms', {
   id: text('id').primaryKey(),
-  number: text('number').notNull().unique(),
+  tenantId: text('tenant_id').notNull().references(() => tenants.id),
+  number: text('number').notNull(),
   floor: integer('floor').notNull(),
   type: text('type', { enum: ['individual', 'doble', 'suite', 'familiar'] }).notNull(),
   maxCapacity: integer('max_capacity').notNull(),
@@ -22,20 +34,26 @@ export const rooms = pgTable('rooms', {
   status: text('status', { enum: ['libre', 'ocupada', 'mantenimiento', 'limpieza'] }).notNull().default('libre'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
-})
+}, (table) => ({
+  uniq: sql`UNIQUE (${table.tenantId}, ${table.number})`,
+}))
 
 export const guests = pgTable('guests', {
   id: text('id').primaryKey(),
+  tenantId: text('tenant_id').notNull().references(() => tenants.id),
   name: text('name').notNull(),
-  document: text('document').notNull().unique(),
+  document: text('document').notNull(),
   country: text('country').notNull(),
   email: text('email').notNull(),
   phone: text('phone').notNull(),
   createdAt: text('created_at').notNull(),
-})
+}, (table) => ({
+  uniqDoc: sql`UNIQUE (${table.tenantId}, ${table.document})`,
+}))
 
 export const reservations = pgTable('reservations', {
   id: text('id').primaryKey(),
+  tenantId: text('tenant_id').notNull().references(() => tenants.id),
   guestId: text('guest_id').notNull().references(() => guests.id),
   roomId: text('room_id').notNull().references(() => rooms.id),
   checkIn: text('check_in').notNull(),
@@ -53,6 +71,7 @@ export const reservations = pgTable('reservations', {
 
 export const products = pgTable('products', {
   id: text('id').primaryKey(),
+  tenantId: text('tenant_id').notNull().references(() => tenants.id),
   name: text('name').notNull(),
   category: text('category', { enum: ['desayunos', 'almuerzos', 'cenas', 'snacks', 'bebidas'] }).notNull(),
   price: real('price').notNull(),
@@ -65,6 +84,7 @@ export const products = pgTable('products', {
 
 export const sales = pgTable('sales', {
   id: text('id').primaryKey(),
+  tenantId: text('tenant_id').notNull().references(() => tenants.id),
   items: jsonb('items').$type<{ productId: string; quantity: number; unitPrice: number }[]>().notNull(),
   total: real('total').notNull(),
   paymentMethod: text('payment_method', { enum: ['efectivo', 'tarjeta', 'cargo_habitacion'] }).notNull(),
@@ -76,6 +96,7 @@ export const sales = pgTable('sales', {
 
 export const invoices = pgTable('invoices', {
   id: text('id').primaryKey(),
+  tenantId: text('tenant_id').notNull().references(() => tenants.id),
   reservationId: text('reservation_id').notNull().references(() => reservations.id),
   guestId: text('guest_id').notNull().references(() => guests.id),
   roomNights: jsonb('room_nights').$type<{ nights: number; pricePerNight: number }>().notNull(),
@@ -91,6 +112,7 @@ export const invoices = pgTable('invoices', {
 
 export const expenses = pgTable('expenses', {
   id: text('id').primaryKey(),
+  tenantId: text('tenant_id').notNull().references(() => tenants.id),
   category: text('category', { enum: ['mantenimiento', 'limpieza', 'servicios', 'nominas', 'otros'] }).notNull(),
   amount: real('amount').notNull(),
   date: text('date').notNull(),
@@ -98,16 +120,8 @@ export const expenses = pgTable('expenses', {
   createdAt: text('created_at').notNull(),
 })
 
-export const refreshSessions = pgTable('refresh_sessions', {
-  id: text('id').primaryKey(),
-  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  createdAt: text('created_at').notNull(),
-  expiresAt: text('expires_at').notNull(),
-  revokedAt: text('revoked_at'),
-})
-
 export const settings = pgTable('settings', {
-  id: text('id').primaryKey().default('main'),
+  tenantId: text('tenant_id').primaryKey().references(() => tenants.id),
   legalName: text('legal_name').notNull().default(''),
   taxId: text('tax_id').notNull().default(''),
   address: text('address').notNull().default(''),
@@ -117,6 +131,17 @@ export const settings = pgTable('settings', {
   updatedAt: text('updated_at').notNull(),
 })
 
+export const refreshSessions = pgTable('refresh_sessions', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  tenantId: text('tenant_id').notNull().references(() => tenants.id),
+  createdAt: text('created_at').notNull(),
+  expiresAt: text('expires_at').notNull(),
+  revokedAt: text('revoked_at'),
+})
+
+export type Tenant = typeof tenants.$inferSelect
+export type NewTenant = typeof tenants.$inferInsert
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
 export type Room = typeof rooms.$inferSelect

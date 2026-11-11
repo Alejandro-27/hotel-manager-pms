@@ -7,6 +7,7 @@ import type { LoginFormData, RegisterFormData } from "./validations"
 interface AuthContextType {
   user: AuthUser | null
   isLoading: boolean
+  isPending: boolean
   login: (data: LoginFormData) => Promise<void>
   register: (data: RegisterFormData) => Promise<void>
   logout: () => Promise<void>
@@ -44,14 +45,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const register = useCallback(async (data: RegisterFormData) => {
-    const { user: u } = await api.auth.register({
+    await api.auth.register({
       name: data.name,
       email: data.email,
       password: data.password,
-      hotelName: data.hotelName,
       acceptTerms: data.acceptTerms,
     })
-    setUser(u)
   }, [])
 
   const logout = useCallback(async () => {
@@ -68,8 +67,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(u)
   }, [])
 
+  const isPending = !!user && user.status !== 'activo'
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, isLoading, isPending, login, register, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   )

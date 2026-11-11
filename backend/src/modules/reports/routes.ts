@@ -6,18 +6,18 @@ import { financialQuerySchema } from './schemas.js'
 export default async function reportRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>()
 
-  typedApp.get('/api/reports/dashboard', { preHandler: [app.authenticate] }, async () => {
-    return getDashboard()
+  typedApp.get('/api/reports/dashboard', { preHandler: [app.authenticate] }, async (req) => {
+    return getDashboard(req.authUser.tenantId!)
   })
 
   typedApp.get('/api/reports/financial', {
     preHandler: [app.requireAdmin],
     schema: { querystring: financialQuerySchema },
   }, async (req) => {
-    return getFinancialReport(req.query.months)
+    return getFinancialReport(req.authUser.tenantId!, req.query.months)
   })
 
-  typedApp.get('/api/reports/occupancy', { preHandler: [app.authenticate] }, async () => {
-    return getOccupancyReport()
+  typedApp.get('/api/reports/occupancy', { preHandler: [app.authenticate] }, async (req) => {
+    return getOccupancyReport(req.authUser.tenantId!)
   })
 }

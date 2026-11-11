@@ -22,62 +22,64 @@ export function computeTotalAmount(pricePerNight: number, checkIn: string, check
   return pricePerNight * daysBetween(checkIn, checkOut)
 }
 
-export async function listReservations(filters: ReservationFilters = {}) {
-  const conditions = []
+export async function listReservations(tenantId: string, filters: ReservationFilters = {}) {
+  const conditions = [eq(reservations.tenantId, tenantId)]
   if (filters.status) conditions.push(eq(reservations.status, filters.status))
   if (filters.roomId) conditions.push(eq(reservations.roomId, filters.roomId))
   if (filters.guestId) conditions.push(eq(reservations.guestId, filters.guestId))
 
-  const query = db.select().from(reservations)
-  const filtered = conditions.length > 0 ? query.where(and(...conditions)) : query
-  return filtered.orderBy(desc(reservations.createdAt))
+  return db.select().from(reservations)
+    .where(and(...conditions))
+    .orderBy(desc(reservations.createdAt))
 }
 
-export async function getReservationById(id: string) {
-  const reservation = (await db.select().from(reservations).where(eq(reservations.id, id)).limit(1))[0]
+export async function getReservationById(tenantId: string, id: string) {
+  const reservation = (await db.select().from(reservations).where(and(
+    eq(reservations.id, id),
+    eq(reservations.tenantId, tenantId),
+  )).limit(1))[0]
   if (!reservation) throw new AppError(404, 'Reserva no encontrada')
   return reservation
 }
 
-export async function checkRoomAvailability(roomId: string, checkIn: string, checkOut: string, excludeId?: string): Promise<void> {
-  const overlapping = (await db.select().from(reservations).where(and(
+export async function checkRoomAvailability(tenantId: string, roomId: string, checkIn: string, checkOut: string, excludeId?: string): Promise<void> {
+  const conditions = [
+    eq(reservations.tenantId, tenantId),
     eq(reservations.roomId, roomId),
     inArray(reservations.status, ['confirmada', 'checkin']),
     lt(reservations.checkIn, checkOut),
     gt(reservations.checkOut, checkIn),
-  )).limit(1))[0]
+  ]
+  const overlapping = (await db.select().from(reservations).where(and(...conditions)).limit(1))[0]
 
   if (overlapping && overlapping.id !== excludeId) {
     throw new AppError(409, `La habitación ya tiene una reserva del ${overlapping.checkIn} al ${overlapping.checkOut}`)
   }
 }
 
-export async function createReservation(input: CreateReservationInput) {
+export async function createReservation(tenantId: string, input: CreateReservationInput) {
   if (new Date(input.checkOut) <= new Date(input.checkIn)) {
     throw new AppError(400, 'La fecha de salida debe ser posterior a la de entrada')
   }
 
   return db.transaction(async (tx) => {
-    const room = (await tx.select().from(rooms).where(eq(rooms.id, input.roomId)).limit(1).for('update'))[0]
+    const room = (await tx.select().from(rooms).where(and(
+      eq(rooms.id, input.roomId),
+      eq(rooms.tenantId, tenantId),
+    )).limit(1).for('update'))[0]
     if (!room) throw new AppError(404, 'Habitación no encontrada')
 
-    const guest = (await tx.select().from(guests).where(eq(guests.id, input.guestId)).limit(1))[0]
+    const guest = (await tx.select().from(guests).where(and(
+      eq(guests.id, input.guestId),
+      eq(guests.tenantId, tenantId),
+    )).limit(1))[0]
     if (!guest) throw new AppError(404, 'Huésped no encontrado')
 
     if (input.guests > room.maxCapacity) {
       throw new AppError(400, `La habitación tiene capacidad máxima de ${room.maxCapacity} personas`)
     }
 
-    const overlapping = (await tx.select().from(reservations).where(and(
-      eq(reservations.roomId, input.roomId),
-      inArray(reservations.status, ['confirmada', 'checkin']),
-      lt(reservations.checkIn, input.checkOut),
-      gt(reservations.checkOut, input.checkIn),
-    )).limit(1))[0]
-
-    if (overlapping) {
-      throw new AppError(409, `La habitación ya tiene una reserva del ${overlapping.checkIn} al ${overlapping.checkOut}`)
-    }
+    await checkRoomAvailability(tenantId, input.roomId, input.checkIn, input.checkOut)
 
     const now = new Date().toISOString()
     const id = randomUUID()
@@ -86,6 +88,7 @@ export async function createReservation(input: CreateReservationInput) {
 
     await tx.insert(reservations).values({
       id,
+      tenantId,
       ...input,
       cancellationPolicyAcceptedAt: now,
       advancePayment,
@@ -95,13 +98,19 @@ export async function createReservation(input: CreateReservationInput) {
       updatedAt: now,
     })
 
-    return (await tx.select().from(reservations).where(eq(reservations.id, id)).limit(1))[0]
+    return (await tx.select().from(reservations).where(and(
+      eq(reservations.id, id),
+      eq(reservations.tenantId, tenantId),
+    )).limit(1))[0]
   })
 }
 
-export async function checkInReservation(id: string) {
+export async function checkInReservation(tenantId: string, id: string) {
   return db.transaction(async (tx) => {
-    const reservation = (await tx.select().from(reservations).where(eq(reservations.id, id)).limit(1))[0]
+    const reservation = (await tx.select().from(reservations).where(and(
+      eq(reservations.id, id),
+      eq(reservations.tenantId, tenantId),
+    )).limit(1))[0]
     if (!reservation) throw new AppError(404, 'Reserva no encontrada')
     if (reservation.status !== 'confirmada') {
       throw new AppError(409, `Solo se puede hacer check-in a reservas confirmadas (estado actual: ${reservation.status})`)
@@ -113,15 +122,21 @@ export async function checkInReservation(id: string) {
       .where(eq(reservations.id, id))
     await tx.update(rooms)
       .set({ status: 'ocupada', updatedAt: now })
-      .where(eq(rooms.id, reservation.roomId))
+      .where(and(
+        eq(rooms.id, reservation.roomId),
+        eq(rooms.tenantId, tenantId),
+      ))
 
     return (await tx.select().from(reservations).where(eq(reservations.id, id)).limit(1))[0]
   })
 }
 
-export async function checkOutReservation(id: string) {
+export async function checkOutReservation(tenantId: string, id: string) {
   return db.transaction(async (tx) => {
-    const reservation = (await tx.select().from(reservations).where(eq(reservations.id, id)).limit(1))[0]
+    const reservation = (await tx.select().from(reservations).where(and(
+      eq(reservations.id, id),
+      eq(reservations.tenantId, tenantId),
+    )).limit(1))[0]
     if (!reservation) throw new AppError(404, 'Reserva no encontrada')
     if (reservation.status !== 'checkin') {
       throw new AppError(409, `Solo se puede hacer check-out a reservas con check-in hecho (estado actual: ${reservation.status})`)
@@ -133,16 +148,22 @@ export async function checkOutReservation(id: string) {
       .where(eq(reservations.id, id))
     await tx.update(rooms)
       .set({ status: 'libre', updatedAt: now })
-      .where(eq(rooms.id, reservation.roomId))
+      .where(and(
+        eq(rooms.id, reservation.roomId),
+        eq(rooms.tenantId, tenantId),
+      ))
 
-    await syncInvoiceForReservation(tx, reservation)
+    await syncInvoiceForReservation(tx, reservation, tenantId)
     return (await tx.select().from(reservations).where(eq(reservations.id, id)).limit(1))[0]
   })
 }
 
-export async function cancelReservation(id: string) {
+export async function cancelReservation(tenantId: string, id: string) {
   return db.transaction(async (tx) => {
-    const reservation = (await tx.select().from(reservations).where(eq(reservations.id, id)).limit(1))[0]
+    const reservation = (await tx.select().from(reservations).where(and(
+      eq(reservations.id, id),
+      eq(reservations.tenantId, tenantId),
+    )).limit(1))[0]
     if (!reservation) throw new AppError(404, 'Reserva no encontrada')
     if (reservation.status === 'checkout' || reservation.status === 'cancelada') {
       throw new AppError(409, `No se puede cancelar una reserva con estado ${reservation.status}`)

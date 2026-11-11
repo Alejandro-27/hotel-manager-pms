@@ -30,7 +30,7 @@ export function SettingsView() {
   const isAdmin = user?.role === "admin"
 
   const [name, setName] = useState(user?.name ?? "")
-  const [hotelName, setHotelName] = useState(user?.hotelName ?? "")
+  const [tenantName, setHotelName] = useState(user?.tenantName ?? "")
   const [saving, setSaving] = useState(false)
 
   const [currentPassword, setCurrentPassword] = useState("")
@@ -46,7 +46,7 @@ export function SettingsView() {
   useEffect(() => {
     if (user) {
       setName(user.name)
-      setHotelName(user.hotelName ?? "")
+      setHotelName(user.tenantName ?? "")
     }
   }, [user])
 
@@ -95,7 +95,7 @@ export function SettingsView() {
   async function handleSaveProfile() {
     setSaving(true)
     try {
-      await api.auth.updateProfile({ name, hotelName: hotelName.trim() || null })
+      await api.auth.updateProfile({ name })
       await refreshUser()
       toast.success("Perfil actualizado")
     } catch (err) {
@@ -178,9 +178,9 @@ export function SettingsView() {
                   <Badge variant="secondary" className="text-xs capitalize">
                     {user?.role}
                   </Badge>
-                  {user?.hotelName && (
+                  {user?.tenantName && (
                     <Badge className="bg-emerald-100 text-emerald-800 border-0 text-xs">
-                      Hotel: {user.hotelName}
+                      Hotel: {user.tenantName}
                     </Badge>
                   )}
                 </div>
@@ -199,7 +199,7 @@ export function SettingsView() {
                   <Label htmlFor="profile-hotel">Nombre del Hotel</Label>
                   <Input
                     id="profile-hotel"
-                    value={hotelName}
+                    value={tenantName}
                     onChange={(e) => setHotelName(e.target.value)}
                     placeholder="Mi Hotel"
                   />

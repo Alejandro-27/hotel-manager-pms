@@ -226,7 +226,7 @@ export function ReportsView() {
   const avgOccupancy = occupancy?.rate ?? 0
   const revPerRoom = useMemo(() => (rooms.length ? Math.round(totalRevenue / rooms.length) : 0), [totalRevenue, rooms.length])
 
-  const hotelName = user?.hotelName?.trim() || "Hotel"
+  const hotelName = user?.tenantName?.trim() || "Hotel"
   const periodLabel = periodRangeLabel(periodMonths[period] ?? 6)
   const generatedAt = new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short", year: "numeric" }).format(new Date())
 

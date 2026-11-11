@@ -10,21 +10,21 @@ export default async function guestRoutes(app: FastifyInstance) {
     preHandler: [app.authenticate],
     schema: { querystring: listGuestsQuerySchema },
   }, async (req) => {
-    return listGuests(req.query.q)
+    return listGuests(req.authUser.tenantId!, req.query.q)
   })
 
   typedApp.get('/api/guests/:id', {
     preHandler: [app.authenticate],
     schema: { params: guestParamsSchema },
   }, async (req) => {
-    return getGuestById(req.params.id)
+    return getGuestById(req.authUser.tenantId!, req.params.id)
   })
 
   typedApp.post('/api/guests', {
     preHandler: [app.authenticate],
     schema: { body: createGuestSchema },
   }, async (req, reply) => {
-    const guest = await createGuest(req.body)
+    const guest = await createGuest(req.authUser.tenantId!, req.body)
     reply.code(201).send(guest)
   })
 
@@ -32,6 +32,6 @@ export default async function guestRoutes(app: FastifyInstance) {
     preHandler: [app.authenticate],
     schema: { params: guestParamsSchema, body: updateGuestSchema },
   }, async (req) => {
-    return updateGuest(req.params.id, req.body)
+    return updateGuest(req.authUser.tenantId!, req.params.id, req.body)
   })
 }

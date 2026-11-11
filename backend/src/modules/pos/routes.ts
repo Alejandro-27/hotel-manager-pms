@@ -10,14 +10,14 @@ export default async function posRoutes(app: FastifyInstance) {
     preHandler: [app.authenticate],
     schema: { querystring: listProductsQuerySchema },
   }, async (req) => {
-    return listProducts(req.query.category)
+    return listProducts(req.authUser.tenantId!, req.query.category)
   })
 
   typedApp.post('/api/products', {
     preHandler: [app.requireAdmin],
     schema: { body: createProductSchema },
   }, async (req, reply) => {
-    const product = await createProduct(req.body)
+    const product = await createProduct(req.authUser.tenantId!, req.body)
     reply.code(201).send(product)
   })
 
@@ -25,21 +25,21 @@ export default async function posRoutes(app: FastifyInstance) {
     preHandler: [app.authenticate],
     schema: { params: productParamsSchema, body: updateStockSchema },
   }, async (req) => {
-    return updateStock(req.params.id, req.body)
+    return updateStock(req.authUser.tenantId!, req.params.id, req.body)
   })
 
   typedApp.patch('/api/products/:id', {
     preHandler: [app.requireAdmin],
     schema: { params: productParamsSchema, body: updateProductSchema },
   }, async (req) => {
-    return updateProduct(req.params.id, req.body)
+    return updateProduct(req.authUser.tenantId!, req.params.id, req.body)
   })
 
   typedApp.delete('/api/products/:id', {
     preHandler: [app.requireAdmin],
     schema: { params: productParamsSchema },
   }, async (req, reply) => {
-    await deleteProduct(req.params.id)
+    await deleteProduct(req.authUser.tenantId!, req.params.id)
     reply.code(204).send()
   })
 
@@ -47,7 +47,7 @@ export default async function posRoutes(app: FastifyInstance) {
     preHandler: [app.authenticate],
     schema: { body: createSaleSchema },
   }, async (req, reply) => {
-    const sale = await createSale(req.body)
+    const sale = await createSale(req.authUser.tenantId!, req.body)
     reply.code(201).send(sale)
   })
 
@@ -55,6 +55,6 @@ export default async function posRoutes(app: FastifyInstance) {
     preHandler: [app.authenticate],
     schema: { querystring: listSalesQuerySchema },
   }, async (req) => {
-    return listSales(req.query.date)
+    return listSales(req.authUser.tenantId!, req.query.date)
   })
 }

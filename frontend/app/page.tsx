@@ -20,6 +20,7 @@ import { ReportsView } from "@/components/views/reports-view"
 import { AuthScreen } from "@/components/auth-screen"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useAuth } from "@/lib/auth-context"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -40,7 +41,7 @@ const viewTitles: Record<string, string> = {
 
 export default function Page() {
   const [activeView, setActiveView] = useState("dashboard")
-  const { user, isLoading, logout } = useAuth()
+  const { user, isLoading, isPending, logout } = useAuth()
 
   if (isLoading) {
     return <LoadingScreen />
@@ -48,6 +49,21 @@ export default function Page() {
 
   if (!user) {
     return <AuthScreen />
+  }
+
+  if (isPending) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-6">
+        <Alert className="w-full max-w-md">
+          <AlertTitle>Cuenta pendiente de aprobación</AlertTitle>
+          <AlertDescription>
+            Su cuenta ({user.email}) ha sido creada pero aún no ha sido activada por el
+            administrador del sistema. Espere a que se le asigne un hotel y un rol antes de
+            poder iniciar sesión.
+          </AlertDescription>
+        </Alert>
+      </div>
+    )
   }
 
   return (
@@ -92,7 +108,7 @@ export default function Page() {
           {activeView === "reports" && <ReportsView />}
 
           <footer className="mt-8 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 border-t pt-4 text-xs text-muted-foreground">
-            <span>&copy; {new Date().getFullYear()} {user.hotelName?.trim() || "HotelManager"}</span>
+            <span>&copy; {new Date().getFullYear()} {user.tenantName?.trim() || "HotelManager"}</span>
             <Link href="/legal/privacidad" className="hover:text-foreground hover:underline">
               Privacidad
             </Link>

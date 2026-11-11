@@ -14,21 +14,21 @@ export default async function reservationRoutes(app: FastifyInstance) {
     schema: { querystring: listReservationsQuerySchema },
   }, async (req) => {
     const { status, roomId, guestId } = req.query
-    return listReservations({ status, roomId, guestId })
+    return listReservations(req.authUser.tenantId!, { status, roomId, guestId })
   })
 
   typedApp.get('/api/reservations/:id', {
     preHandler: [app.authenticate],
     schema: { params: reservationParamsSchema },
   }, async (req) => {
-    return getReservationById(req.params.id)
+    return getReservationById(req.authUser.tenantId!, req.params.id)
   })
 
   typedApp.post('/api/reservations', {
     preHandler: [app.authenticate],
     schema: { body: createReservationSchema },
   }, async (req, reply) => {
-    const reservation = await createReservation(req.body)
+    const reservation = await createReservation(req.authUser.tenantId!, req.body)
     reply.code(201).send(reservation)
   })
 
@@ -36,20 +36,20 @@ export default async function reservationRoutes(app: FastifyInstance) {
     preHandler: [app.authenticate],
     schema: { params: reservationParamsSchema },
   }, async (req) => {
-    return checkInReservation(req.params.id)
+    return checkInReservation(req.authUser.tenantId!, req.params.id)
   })
 
   typedApp.patch('/api/reservations/:id/checkout', {
     preHandler: [app.authenticate],
     schema: { params: reservationParamsSchema },
   }, async (req) => {
-    return checkOutReservation(req.params.id)
+    return checkOutReservation(req.authUser.tenantId!, req.params.id)
   })
 
   typedApp.patch('/api/reservations/:id/cancel', {
     preHandler: [app.authenticate],
     schema: { params: reservationParamsSchema },
   }, async (req) => {
-    return cancelReservation(req.params.id)
+    return cancelReservation(req.authUser.tenantId!, req.params.id)
   })
 }

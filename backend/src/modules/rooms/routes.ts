@@ -11,21 +11,21 @@ export default async function roomRoutes(app: FastifyInstance) {
     schema: { querystring: listRoomsQuerySchema },
   }, async (req) => {
     const { status, type, floor } = req.query
-    return listRooms({ status, type, floor })
+    return listRooms(req.authUser.tenantId!, { status, type, floor })
   })
 
   typedApp.get('/api/rooms/:id', {
     preHandler: [app.authenticate],
     schema: { params: roomParamsSchema },
   }, async (req) => {
-    return getRoomById(req.params.id)
+    return getRoomById(req.authUser.tenantId!, req.params.id)
   })
 
   typedApp.post('/api/rooms', {
     preHandler: [app.requireAdmin],
     schema: { body: createRoomSchema },
   }, async (req, reply) => {
-    const room = await createRoom(req.body)
+    const room = await createRoom(req.authUser.tenantId!, req.body)
     reply.code(201).send(room)
   })
 
@@ -33,13 +33,13 @@ export default async function roomRoutes(app: FastifyInstance) {
     preHandler: [app.requireAdmin],
     schema: { params: roomParamsSchema, body: updateRoomSchema },
   }, async (req) => {
-    return updateRoom(req.params.id, req.body)
+    return updateRoom(req.authUser.tenantId!, req.params.id, req.body)
   })
 
   typedApp.patch('/api/rooms/:id/status', {
     preHandler: [app.authenticate],
     schema: { params: roomParamsSchema, body: updateRoomStatusSchema },
   }, async (req) => {
-    return updateRoomStatus(req.params.id, req.body)
+    return updateRoomStatus(req.authUser.tenantId!, req.params.id, req.body)
   })
 }

@@ -36,8 +36,11 @@ interface StayReservation {
  * Reconstruye todo desde la fuente de verdad (habitacion + ventas cargo a habitacion),
  * preservando los pagos ya registrados en la factura.
  */
-export async function syncInvoiceForReservation(tx: DbLike, reservation: StayReservation) {
-  const room = (await tx.select().from(rooms).where(eq(rooms.id, reservation.roomId)).limit(1))[0]
+export async function syncInvoiceForReservation(tx: DbLike, reservation: StayReservation, tenantId: string) {
+  const room = (await tx.select().from(rooms).where(and(
+    eq(rooms.id, reservation.roomId),
+    eq(rooms.tenantId, tenantId),
+  )).limit(1))[0]
   if (!room) return null
 
   const nights = daysBetween(reservation.checkIn, reservation.checkOut)
@@ -45,6 +48,7 @@ export async function syncInvoiceForReservation(tx: DbLike, reservation: StayRes
 
   const roomSales = await tx.select().from(sales).where(and(
     eq(sales.roomId, reservation.roomId),
+    eq(sales.tenantId, tenantId),
     gte(sales.date, reservation.checkIn),
   ))
   const cateringCharges = roomSales.flatMap((s) => s.items)
@@ -54,7 +58,10 @@ export async function syncInvoiceForReservation(tx: DbLike, reservation: StayRes
   const roomNights = { nights, pricePerNight: room.pricePerNight }
   const today = new Date().toISOString().slice(0, 10)
 
-  const existing = (await tx.select().from(invoices).where(eq(invoices.reservationId, reservation.id)).limit(1))[0]
+  const existing = (await tx.select().from(invoices).where(and(
+    eq(invoices.reservationId, reservation.id),
+    eq(invoices.tenantId, tenantId),
+  )).limit(1))[0]
 
   if (existing) {
     const totalDue = Math.round((subtotal - existing.advancePayment) * 100) / 100
@@ -74,8 +81,10 @@ export async function syncInvoiceForReservation(tx: DbLike, reservation: StayRes
   const totalDue = Math.round((subtotal - advancePayment) * 100) / 100
   const status: InvoiceStatus = totalDue <= 0 ? 'pagada' : 'pendiente'
 
+  const invoiceId = randomUUID()
   await tx.insert(invoices).values({
-    id: randomUUID(),
+    id: invoiceId,
+    tenantId,
     reservationId: reservation.id,
     guestId: reservation.guestId,
     roomNights,
@@ -88,31 +97,35 @@ export async function syncInvoiceForReservation(tx: DbLike, reservation: StayRes
     date: today,
     createdAt: new Date().toISOString(),
   })
-  return (await tx.select().from(invoices).where(eq(invoices.reservationId, reservation.id)).limit(1))[0]
+  return (await tx.select().from(invoices).where(eq(invoices.id, invoiceId)).limit(1))[0]
 }
 
-export async function listInvoices(filters: InvoiceFilters = {}) {
-  const conditions = []
+export async function listInvoices(tenantId: string, filters: InvoiceFilters = {}) {
+  const conditions = [eq(invoices.tenantId, tenantId)]
   if (filters.status) conditions.push(eq(invoices.status, filters.status))
   if (filters.guestId) conditions.push(eq(invoices.guestId, filters.guestId))
 
-  const query = db.select().from(invoices)
-  const filtered = conditions.length > 0 ? query.where(and(...conditions)) : query
-  return filtered.orderBy(desc(invoices.createdAt))
+  return db.select().from(invoices).where(and(...conditions)).orderBy(desc(invoices.createdAt))
 }
 
-export async function getInvoiceById(id: string) {
-  const invoice = (await db.select().from(invoices).where(eq(invoices.id, id)).limit(1))[0]
+export async function getInvoiceById(tenantId: string, id: string) {
+  const invoice = (await db.select().from(invoices).where(and(
+    eq(invoices.id, id),
+    eq(invoices.tenantId, tenantId),
+  )).limit(1))[0]
   if (!invoice) throw new AppError(404, 'Factura no encontrada')
   return invoice
 }
 
-export async function payInvoice(id: string, input: PayInvoiceInput) {
+export async function payInvoice(tenantId: string, id: string, input: PayInvoiceInput) {
   return db.transaction(async (tx) => {
     const invoice = (await tx
       .select()
       .from(invoices)
-      .where(eq(invoices.id, id))
+      .where(and(
+        eq(invoices.id, id),
+        eq(invoices.tenantId, tenantId),
+      ))
       .limit(1)
       .for('update'))[0]
     if (!invoice) throw new AppError(404, 'Factura no encontrada')

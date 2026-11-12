@@ -19,6 +19,7 @@ import { SettingsView } from "@/components/views/settings-view"
 import { ReportsView } from "@/components/views/reports-view"
 import { AdminRequestsView } from "@/components/views/admin-requests-view"
 import { TenantsView } from "@/components/views/tenants-view"
+import { RecepcionCreateView } from "@/components/views/recepcion-create-view"
 import { AuthScreen } from "@/components/auth-screen"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useAuth } from "@/lib/auth-context"
@@ -41,6 +42,7 @@ const viewTitles: Record<string, string> = {
   reports: "Informes y KPIs",
   adminRequests: "Solicitudes de cuenta",
   tenants: "Gestión de Hoteles",
+  recepcionCreate: "Crear Recepcionista",
 }
 
 export default function Page() {
@@ -113,6 +115,7 @@ export default function Page() {
           {activeView === "reports" && <ReportsView />}
           {activeView === "adminRequests" && <AdminRequestsView />}
           {activeView === "tenants" && <TenantsView />}
+          {activeView === "recepcionCreate" && <RecepcionCreateView />}
 
           <footer className="mt-8 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 border-t pt-4 text-xs text-muted-foreground">
             <span>&copy; {new Date().getFullYear()} {user.tenantName?.trim() || "HotelManager"}</span>

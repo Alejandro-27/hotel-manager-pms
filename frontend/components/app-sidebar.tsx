@@ -15,6 +15,7 @@ import {
   Scale,
   ShieldAlert,
   Building2,
+  UserPlus,
 } from "lucide-react"
 import {
   Sidebar,
@@ -46,6 +47,7 @@ const mainNav = [
 
 const adminTools = [
   { title: "Gestion de Habitaciones", icon: BedDouble, id: "rooms" },
+  { title: "Crear Recepcionista", icon: UserPlus, id: "recepcionCreate" },
   { title: "Configuracion", icon: Settings, id: "settings" },
 ]
 

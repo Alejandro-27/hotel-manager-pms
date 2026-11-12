@@ -39,10 +39,16 @@ export const createTenantSchema = z.object({
   slug: z.string().min(2, 'Slug requerido').regex(/^[a-z0-9-]+$/, 'Slug inválido (solo minúsculas, números y guiones)'),
 })
 
+export const updateTenantSchema = z.object({
+  name: z.string().min(2, 'Nombre del hotel requerido').optional(),
+  slug: z.string().min(2, 'Slug requerido').regex(/^[a-z0-9-]+$/, 'Slug inválido (solo minúsculas, números y guiones)').optional(),
+})
+
 export const createRecepcionSchema = z.object({
   name: z.string().min(2, 'Nombre requerido'),
   email: z.string().email('Email inválido'),
   password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
+  tenantId: z.string().optional(),
 })
 
 export type RegisterInput = z.infer<typeof registerSchema>
@@ -52,4 +58,5 @@ export type ChangePasswordInput = z.infer<typeof changePasswordSchema>
 export type ApproveRequestInput = z.infer<typeof approveRequestSchema>
 export type RejectRequestInput = z.infer<typeof rejectRequestSchema>
 export type CreateTenantInput = z.infer<typeof createTenantSchema>
+export type UpdateTenantInput = z.infer<typeof updateTenantSchema>
 export type CreateRecepcionInput = z.infer<typeof createRecepcionSchema>

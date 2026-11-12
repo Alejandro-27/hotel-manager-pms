@@ -59,10 +59,16 @@ export interface CreateTenantInput {
   slug: string
 }
 
+export interface UpdateTenantInput {
+  name?: string
+  slug?: string
+}
+
 export interface CreateRecepcionInput {
   name: string
   email: string
   password: string
+  tenantId?: string
 }
 
 export interface DashboardReport {
@@ -196,6 +202,16 @@ export const api = {
       request<{ id: string; name: string; slug: string }>(
         '/api/auth/tenants',
         { method: 'POST', body: JSON.stringify(input) },
+      ),
+    updateTenant: (tenantId: string, input: UpdateTenantInput) =>
+      request<TenantInfo>(
+        `/api/auth/tenants/${tenantId}`,
+        { method: 'PATCH', body: JSON.stringify(input) },
+      ),
+    deleteTenant: (tenantId: string) =>
+      request<{ ok: boolean }>(
+        `/api/auth/tenants/${tenantId}`,
+        { method: 'DELETE' },
       ),
     createRecepcion: (input: CreateRecepcionInput) =>
       request<{ user: AuthUser }>('/api/auth/recepcion', {

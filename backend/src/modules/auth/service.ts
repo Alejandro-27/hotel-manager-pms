@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs'
 import { db } from '../../db/index.js'
 import { refreshSessions, tenants, users } from '../../db/schema.js'
 import { AppError } from '../../plugins/error-handler.js'
-import type { LoginInput, RegisterInput, UpdateProfileInput } from './schemas.js'
+import type { LoginInput, RegisterInput, UpdateProfileInput, UpdateTenantInput } from './schemas.js'
 import type { AuthUser } from '../../plugins/auth.js'
 
 export interface PublicUser {
@@ -342,4 +342,31 @@ export async function rejectRequest(userId: string): Promise<void> {
 
 export async function listTenants(): Promise<{ id: string; name: string; slug: string }[]> {
   return db.select({ id: tenants.id, name: tenants.name, slug: tenants.slug }).from(tenants)
+}
+
+export async function updateTenant(tenantId: string, input: UpdateTenantInput): Promise<void> {
+  const existing = (await db.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1))[0]
+  if (!existing) throw new AppError(404, 'Hotel no encontrado')
+
+  const changes: Record<string, string> = {}
+  if (input.name !== undefined) changes.name = input.name
+  if (input.slug !== undefined) changes.slug = input.slug
+  changes.updatedAt = new Date().toISOString()
+
+  if (Object.keys(changes).length > 1) {
+    await db.update(tenants).set(changes).where(eq(tenants.id, tenantId))
+  }
+}
+
+export async function deleteTenant(tenantId: string): Promise<void> {
+  const existing = (await db.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1))[0]
+  if (!existing) throw new AppError(404, 'Hotel no encontrado')
+
+  // Verificar que no haya usuarios asociados
+  const usersCount = await db.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.tenantId, tenantId))
+  if (Number(usersCount[0]?.count ?? 0) > 0) {
+    throw new AppError(409, 'No se puede eliminar el hotel: tiene usuarios asociados')
+  }
+
+  await db.delete(tenants).where(eq(tenants.id, tenantId))
 }

@@ -14,6 +14,7 @@ import {
   LogOut,
   Scale,
   ShieldAlert,
+  Building2,
 } from "lucide-react"
 import {
   Sidebar,
@@ -144,6 +145,17 @@ export function AppSidebar({ activeView, onNavigate, userName, userEmail, userRo
               <CollapsibleContent>
                 <SidebarGroupContent>
                   <SidebarMenu>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        isActive={activeView === "tenants"}
+                        aria-current={activeView === "tenants" ? "page" : undefined}
+                        onClick={() => onNavigate("tenants")}
+                        tooltip="Gestión de Hoteles"
+                      >
+                        <Building2 className="mr-2 size-4" />
+                        <span>Gestión de Hoteles</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
                     <SidebarMenuItem>
                       <SidebarMenuButton
                         isActive={activeView === "adminRequests"}

@@ -60,6 +60,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // El logout local debe funcionar aunque la cookie haya expirado
     }
     setUser(null)
+    if (typeof window !== 'undefined') {
+      window.location.pathname = '/'
+    }
   }, [])
 
   const refreshUser = useCallback(async () => {

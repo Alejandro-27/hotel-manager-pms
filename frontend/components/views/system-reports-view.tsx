@@ -29,9 +29,11 @@ import {
   TrendingUp,
   Loader2,
   ShieldAlert,
+  AlertTriangle,
 } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import { api } from "@/lib/api"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 interface SystemOverview {
   totalTenants: number
@@ -59,13 +61,15 @@ interface TenantStats {
 export function SystemReportsView() {
   const [overview, setOverview] = useState<SystemOverview | null>(null)
   const [tenantStats, setTenantStats] = useState<TenantStats[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const fetchOverview = useCallback(async () => {
     try {
       const data = await api.auth.getSystemOverview?.()
       if (data) setOverview(data)
     } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al cargar informes del sistema")
       toast({
         title: "Error al cargar informes del sistema",
         description: err instanceof Error ? err.message : "Intente de nuevo",
@@ -79,6 +83,7 @@ export function SystemReportsView() {
       const data = await api.auth.getTenantsWithStats?.()
       if (data) setTenantStats(data.tenants)
     } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al cargar estadísticas de hoteles")
       toast({
         title: "Error al cargar estadísticas de hoteles",
         description: err instanceof Error ? err.message : "Intente de nuevo",
@@ -88,14 +93,25 @@ export function SystemReportsView() {
   }, [])
 
   useEffect(() => {
-    setLoading(true)
     Promise.all([fetchOverview(), fetchTenantStats()]).finally(() => setLoading(false))
   }, [fetchOverview, fetchTenantStats])
 
-  if (loading && !overview && tenantStats.length === 0) {
+  if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
+
+  if (error && !overview && tenantStats.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px]">
+        <AlertTriangle className="mb-4 h-8 w-8 text-destructive" />
+        <Alert variant="destructive">
+          <AlertTitle>Error cargando informes</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       </div>
     )
   }

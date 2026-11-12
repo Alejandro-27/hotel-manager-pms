@@ -133,6 +133,8 @@ export default async function authRoutes(app: FastifyInstance) {
     reply.send({ user })
   })
 
+  const sameSite: 'none' | 'lax' = env.nodeEnv === 'production' ? 'none' : 'lax'
+
   typedApp.post('/api/auth/logout', async (req, reply) => {
     const token = req.cookies?.refreshToken
     if (token) {
@@ -143,8 +145,9 @@ export default async function authRoutes(app: FastifyInstance) {
         // cookie inválida o expirada: solo se limpian las cookies
       }
     }
-    reply.clearCookie('token', { path: '/' })
-    reply.clearCookie('refreshToken', { path: '/api/auth' })
+    // Limpiar cookies con las mismas opciones con las que se crearon
+    reply.clearCookie('token', { path: '/', sameSite, secure: env.nodeEnv === 'production' })
+    reply.clearCookie('refreshToken', { path: '/api/auth', sameSite, secure: env.nodeEnv === 'production' })
     reply.send({ ok: true })
   })
 

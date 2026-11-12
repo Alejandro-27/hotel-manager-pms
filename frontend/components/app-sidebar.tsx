@@ -132,7 +132,7 @@ export function AppSidebar({ activeView, onNavigate, userName, userEmail, userRo
           </SidebarGroup>
         </Collapsible>
 
-        {userRole === "admin" && (
+        {userRole === "superadmin" && (
           <Collapsible defaultOpen className="group/collapsible">
             <SidebarGroup>
               <SidebarGroupLabel asChild>
@@ -147,7 +147,7 @@ export function AppSidebar({ activeView, onNavigate, userName, userEmail, userRo
                     <SidebarMenuItem>
                       <SidebarMenuButton
                         isActive={activeView === "adminRequests"}
-                      aria-current={activeView === "adminRequests" ? "page" : undefined}
+                        aria-current={activeView === "adminRequests" ? "page" : undefined}
                         onClick={() => onNavigate("adminRequests")}
                         tooltip="Solicitudes de cuenta"
                       >

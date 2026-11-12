@@ -43,7 +43,6 @@ import {
 } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import { api } from "@/lib/api"
-import { useAuth } from "@/lib/auth-context"
 import type { PendingRequest, TenantInfo, ApproveRequestInput, CreateTenantInput } from "@/lib/api"
 
 function StatusBadge({ status }: { status: string }) {
@@ -61,9 +60,6 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export function AdminRequestsView() {
-  const { user } = useAuth()
-  const isSuperadmin = user?.role === 'superadmin'
-  const userTenantId = user?.tenantId ?? null
   const [requests, setRequests] = useState<PendingRequest[]>([])
   const [tenants, setTenants] = useState<TenantInfo[]>([])
   const [loading, setLoading] = useState(false)
@@ -78,11 +74,7 @@ export function AdminRequestsView() {
     setLoading(true)
     try {
       const data = await api.auth.pendingRequests()
-      // Si es admin regular (no superadmin), filtrar solo solicitudes de su tenant
-      const filtered = isSuperadmin
-        ? data.requests
-        : data.requests.filter((r) => r.tenantId === userTenantId)
-      setRequests(filtered)
+      setRequests(data.requests)
     } catch (err) {
       toast({
         title: "Error al cargar solicitudes",
@@ -92,23 +84,21 @@ export function AdminRequestsView() {
     } finally {
       setLoading(false)
     }
-  }, [isSuperadmin, userTenantId])
+  }, [])
 
   const fetchTenants = useCallback(async () => {
-    // Solo superadmin necesita ver todos los tenants
-    if (!isSuperadmin) return
     try {
       const data = await api.auth.tenants()
       setTenants(data.tenants)
     } catch {
       // silencioso
     }
-  }, [isSuperadmin])
+  }, [])
 
   useEffect(() => {
     fetchRequests()
-    if (isSuperadmin) fetchTenants()
-  }, [fetchRequests, fetchTenants, isSuperadmin])
+    fetchTenants()
+  }, [fetchRequests, fetchTenants])
 
   const handleApprove = async (input: ApproveRequestInput) => {
     setSaving(true)
@@ -130,19 +120,6 @@ export function AdminRequestsView() {
   }
 
   const handleReject = async (userId: string) => {
-    // Admin regular solo puede rechazar solicitudes de su propio tenant
-    if (!isSuperadmin) {
-      const reqToReject = requests.find((r) => r.id === userId)
-      if (!reqToReject || reqToReject.tenantId !== userTenantId) {
-        toast({
-          title: "No autorizado",
-          description: "Solo puedes rechazar solicitudes de tu propio hotel",
-          variant: "destructive",
-        })
-        return
-      }
-    }
-
     setSaving(true)
     try {
       await api.auth.rejectRequest({ userId })
@@ -180,8 +157,6 @@ export function AdminRequestsView() {
     }
   }
 
-  const ownTenant = tenants.find((t) => t.id === userTenantId)
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -189,22 +164,16 @@ export function AdminRequestsView() {
         <div>
           <h1 className="text-2xl font-bold">Solicitudes de cuenta</h1>
           <p className="text-muted-foreground">
-            {isSuperadmin
-              ? "Revise y apruebe o rechace las cuentas de todos los hoteles."
-              : "Revise y apruebe o rechace las cuentas de su hotel."}
+            Revise y apruebe o rechace las cuentas de todos los hoteles del sistema.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {isSuperadmin && (
-            <Button
-              onClick={() => setOpenTenantDialog(true)}
-              disabled={saving}
-            >
-              <Building2 className="mr-2 h-4 w-4" />
-              Crear Hotel
-            </Button>
-          )}
-        </div>
+        <Button
+          onClick={() => setOpenTenantDialog(true)}
+          disabled={saving}
+        >
+          <Building2 className="mr-2 h-4 w-4" />
+          Crear Hotel
+        </Button>
       </div>
 
       {/* Empty state */}
@@ -232,8 +201,7 @@ export function AdminRequestsView() {
               <TableHead>Nombre</TableHead>
               <TableHead>Correo</TableHead>
               <TableHead>Rol solicitado</TableHead>
-              {!isSuperadmin && <TableHead>Hotel (suyo)</TableHead>}
-              {isSuperadmin && <TableHead>Hotel</TableHead>}
+              <TableHead>Hotel</TableHead>
               <TableHead>Fecha</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
@@ -248,12 +216,7 @@ export function AdminRequestsView() {
                 <TableCell>
                   <Badge variant="outline">{req.role}</Badge>
                 </TableCell>
-                {!isSuperadmin && (
-                  <TableCell>{ownTenant?.name || "Sin asignar"}</TableCell>
-                )}
-                {isSuperadmin && (
-                  <TableCell>{req.tenantName || <span className="text-muted-foreground">Sin asignar</span>}</TableCell>
-                )}
+                <TableCell>{req.tenantName || <span className="text-muted-foreground">Sin asignar</span>}</TableCell>
                 <TableCell>
                   {new Date(req.createdAt).toLocaleDateString("es-ES")}
                 </TableCell>
@@ -283,7 +246,7 @@ export function AdminRequestsView() {
                   </Button>
                 </TableCell>
               </TableRow>
-              ))}
+            ))}
           </TableBody>
         </Table>
       )}
@@ -313,62 +276,34 @@ export function AdminRequestsView() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="admin">Administrador</SelectItem>
+                    <SelectItem value="admin">Administrador de hotel</SelectItem>
                     <SelectItem value="recepcion">Recepción</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Hotel</label>
-                {isSuperadmin ? (
-                  <Select
-                    defaultValue={selectedRequest?.tenantId ?? ""}
-                    onValueChange={(value) => {
-                      if (selectedRequest) {
-                        setSelectedRequest({ ...selectedRequest, tenantId: value })
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Seleccionar hotel" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {tenants.map((t) => (
-                        <SelectItem key={t.id} value={t.id}>
-                          {t.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <div className="flex items-center">
-                    <Select disabled defaultValue={userTenantId ?? ""}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Seleccionar hotel" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ownTenant && (
-                          <SelectItem key={ownTenant.id} value={ownTenant.id}>
-                            {ownTenant.name}
-                          </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <span className="ml-2 text-xs text-muted-foreground">
-                      (solo puede asignar a su hotel)
-                    </span>
-                  </div>
-                )}
+                <Select
+                  defaultValue={selectedRequest?.tenantId ?? ""}
+                  onValueChange={(value) => {
+                    if (selectedRequest) {
+                      setSelectedRequest({ ...selectedRequest, tenantId: value })
+                    }
+                  }}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Seleccionar hotel" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tenants.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
-            {!isSuperadmin && tenants.length === 0 && !userTenantId && (
-              <Alert variant="destructive">
-                <AlertTitle>No tiene hotel asignado</AlertTitle>
-                <AlertDescription>
-                  Contacte al superadministrador para que le asigne un hotel antes de aprobar usuarios.
-                </AlertDescription>
-              </Alert>
-            )}
           </div>
           <DialogFooter>
             <Button onClick={() => setOpenDialog(false)}>Cancelar</Button>
@@ -382,12 +317,7 @@ export function AdminRequestsView() {
                   })
                 }
               }}
-              disabled={
-                saving ||
-                !selectedRequest?.role ||
-                !selectedRequest?.tenantId ||
-                (!isSuperadmin && selectedRequest.tenantId !== userTenantId)
-              }
+              disabled={saving || !selectedRequest?.role || !selectedRequest?.tenantId || tenants.length === 0}
             >
               {saving ? <Loader2 className="mr-2 h-3 w-3" /> : <CheckCircle2 className="mr-2 h-3 w-3" />}
               Aprobar
@@ -396,50 +326,48 @@ export function AdminRequestsView() {
         </DialogContent>
       </Dialog>
 
-      {/* Create Tenant Dialog (superadmin only) */}
-      {isSuperadmin && (
-        <Dialog open={openTenantDialog} onOpenChange={setOpenTenantDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Crear hotel</DialogTitle>
-              <DialogDescription>
-                Cada usuario debe pertenecer a un hotel. Cree uno antes de aprobar recepciones o administradores de hotel.
-              </DialogDescription>
-            </DialogHeader>
-            <form className="space-y-4" onSubmit={(e) => {
-              e.preventDefault()
-              handleCreateTenant()
-            }}>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Nombre del hotel</label>
-                <Input
-                  value={newTenantName}
-                  onChange={(e) => setNewTenantName(e.target.value)}
-                  placeholder="Ej. Hotel Paraiso"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Slug (identificador único)</label>
-                <Input
-                  value={newTenantSlug}
-                  onChange={(e) => setNewTenantSlug(e.target.value)}
-                  placeholder="Ej. hotel-paraiso"
-                />
-              </div>
-            </form>
-            <DialogFooter>
-              <Button onClick={() => setOpenTenantDialog(false)}>Cancelar</Button>
-              <Button
-                onClick={() => handleCreateTenant()}
-                disabled={saving || !newTenantName || !newTenantSlug}
-              >
-                {saving ? <Loader2 className="mr-2 h-3 w-3" /> : <Plus className="mr-2 h-3 w-3" />}
-                Crear
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+      {/* Create Tenant Dialog */}
+      <Dialog open={openTenantDialog} onOpenChange={setOpenTenantDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Crear hotel</DialogTitle>
+            <DialogDescription>
+              Cada usuario debe pertenecer a un hotel. Cree uno antes de aprobar recepciones o administradores de hotel.
+            </DialogDescription>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={(e) => {
+            e.preventDefault()
+            handleCreateTenant()
+          }}>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Nombre del hotel</label>
+              <Input
+                value={newTenantName}
+                onChange={(e) => setNewTenantName(e.target.value)}
+                placeholder="Ej. Hotel Paraiso"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Slug (identificador único)</label>
+              <Input
+                value={newTenantSlug}
+                onChange={(e) => setNewTenantSlug(e.target.value)}
+                placeholder="Ej. hotel-paraiso"
+              />
+            </div>
+          </form>
+          <DialogFooter>
+            <Button onClick={() => setOpenTenantDialog(false)}>Cancelar</Button>
+            <Button
+              onClick={() => handleCreateTenant()}
+              disabled={saving || !newTenantName || !newTenantSlug}
+            >
+              {saving ? <Loader2 className="mr-2 h-3 w-3" /> : <Plus className="mr-2 h-3 w-3" />}
+              Crear
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

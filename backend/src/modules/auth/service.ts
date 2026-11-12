@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, eq, sql } from 'drizzle-orm'
+import { asc, eq, sql } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 import { db } from '../../db/index.js'
 import { refreshSessions, tenants, users } from '../../db/schema.js'
@@ -261,20 +261,7 @@ export interface PendingRequest {
   tenantName: string | null
 }
 
-export interface ListPendingRequestsInput {
-  requesterRole: string
-  requesterTenantId: string | null
-}
-
-export async function listPendingRequests(input?: ListPendingRequestsInput): Promise<PendingRequest[]> {
-  const conditions = [eq(users.status, 'pendiente')]
-
-  // Un admin regular solo ve solicitudes de su propio tenant.
-  // Un superadmin ve todas las solicitudes de todos los tenants.
-  if (input && input.requesterRole !== 'superadmin' && input.requesterTenantId) {
-    conditions.push(eq(users.tenantId, input.requesterTenantId))
-  }
-
+export async function listPendingRequests(): Promise<PendingRequest[]> {
   const rows = await db
     .select({
       id: users.id,
@@ -288,7 +275,7 @@ export async function listPendingRequests(input?: ListPendingRequestsInput): Pro
     })
     .from(users)
     .leftJoin(tenants, eq(users.tenantId, tenants.id))
-    .where(and(...conditions))
+    .where(eq(users.status, 'pendiente'))
     .orderBy(asc(users.createdAt))
 
   return rows.map((r) => ({
@@ -307,8 +294,6 @@ export interface ApproveRequestInput {
   userId: string
   role: 'admin' | 'recepcion'
   tenantId: string
-  approverRole: string
-  approverTenantId: string | null
 }
 
 export async function approveRequest(input: ApproveRequestInput): Promise<PublicUser> {
@@ -320,12 +305,6 @@ export async function approveRequest(input: ApproveRequestInput): Promise<Public
 
   const tenant = (await db.select().from(tenants).where(eq(tenants.id, input.tenantId)).limit(1))[0]
   if (!tenant) throw new AppError(404, 'Hotel no encontrado')
-
-  // Un admin regular solo puede aprobar usuarios para SU propio tenant.
-  // Un superadmin puede aprobar para cualquier tenant.
-  if (input.approverRole !== 'superadmin' && input.approverTenantId && input.tenantId !== input.approverTenantId) {
-    throw new AppError(403, 'Solo puedes aprobar usuarios para tu propio hotel')
-  }
 
   const now = new Date().toISOString()
   await db.update(users).set({

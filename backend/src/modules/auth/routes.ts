@@ -162,44 +162,27 @@ export default async function authRoutes(app: FastifyInstance) {
   /* ---------- Endpoints de administración del sistema (solo admin aprobado) ---------- */
 
   typedApp.get('/api/auth/pending-requests', {
-    preHandler: [app.requireAdmin],
-  }, async (req) => {
-    const requests = await listPendingRequests({
-      requesterRole: req.authUser.role,
-      requesterTenantId: req.authUser.tenantId,
-    })
+    preHandler: [app.requireSuperAdmin],
+  }, async () => {
+    const requests = await listPendingRequests()
     return { requests }
   })
 
   typedApp.patch('/api/auth/pending-requests/:userId/approve', {
-    preHandler: [app.requireAdmin],
+    preHandler: [app.requireSuperAdmin],
     schema: { params: userParamsSchema, body: approveRequestSchema },
   }, async (req, reply) => {
     const { userId } = req.params as { userId: string }
     const { role, tenantId } = req.body as { role: 'admin' | 'recepcion'; tenantId: string }
-    const user = await approveRequest({
-      userId,
-      role,
-      tenantId,
-      approverRole: req.authUser.role,
-      approverTenantId: req.authUser.tenantId,
-    })
+    const user = await approveRequest({ userId, role, tenantId })
     reply.send({ user })
   })
 
   typedApp.patch('/api/auth/pending-requests/:userId/reject', {
-    preHandler: [app.requireAdmin],
+    preHandler: [app.requireSuperAdmin],
     schema: { params: userParamsSchema, body: rejectRequestSchema },
   }, async (req, reply) => {
     const { userId } = req.params as { userId: string }
-    // Un admin regular solo puede rechazar solicitudes de su propio tenant
-    if (req.authUser.role !== 'superadmin' && req.authUser.tenantId) {
-      const requestToReject = (await db.select().from(users).where(eq(users.id, userId)).limit(1))[0]
-      if (!requestToReject) throw new AppError(404, 'Solicitud no encontrada')
-      if (requestToReject.tenantId && requestToReject.tenantId !== req.authUser.tenantId) {
-        throw new AppError(403, 'Solo puedes rechazar solicitudes de tu propio hotel')
-      }
-    }
     await rejectRequest(userId)
     reply.send({ ok: true })
   })

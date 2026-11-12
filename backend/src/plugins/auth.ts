@@ -17,6 +17,7 @@ declare module 'fastify' {
     authenticate: (req: FastifyRequest, reply: FastifyReply) => Promise<void>
     requireAdmin: (req: FastifyRequest, reply: FastifyReply) => Promise<void>
     requireActive: (req: FastifyRequest, reply: FastifyReply) => Promise<void>
+    requireSuperAdmin: (req: FastifyRequest, reply: FastifyReply) => Promise<void>
   }
   interface FastifyRequest {
     authUser: AuthUser
@@ -71,8 +72,16 @@ export default fp(async (app) => {
   app.decorate('requireAdmin', async (req: FastifyRequest, reply: FastifyReply) => {
     await app.requireActive(req, reply)
     if (reply.sent) return
-    if (req.authUser.role !== 'admin') {
+    if (req.authUser.role !== 'admin' && req.authUser.role !== 'superadmin') {
       reply.code(403).send({ error: 'Requiere rol de administrador' })
+    }
+  })
+
+  app.decorate('requireSuperAdmin', async (req: FastifyRequest, reply: FastifyReply) => {
+    await app.requireActive(req, reply)
+    if (reply.sent) return
+    if (req.authUser.role !== 'superadmin') {
+      reply.code(403).send({ error: 'Requiere rol de superadministrador del sistema' })
     }
   })
 })

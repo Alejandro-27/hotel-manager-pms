@@ -163,8 +163,11 @@ export default async function authRoutes(app: FastifyInstance) {
 
   typedApp.get('/api/auth/pending-requests', {
     preHandler: [app.requireAdmin],
-  }, async () => {
-    const requests = await listPendingRequests()
+  }, async (req) => {
+    const requests = await listPendingRequests({
+      requesterRole: req.authUser.role,
+      requesterTenantId: req.authUser.tenantId,
+    })
     return { requests }
   })
 
@@ -174,7 +177,13 @@ export default async function authRoutes(app: FastifyInstance) {
   }, async (req, reply) => {
     const { userId } = req.params as { userId: string }
     const { role, tenantId } = req.body as { role: 'admin' | 'recepcion'; tenantId: string }
-    const user = await approveRequest({ userId, role, tenantId })
+    const user = await approveRequest({
+      userId,
+      role,
+      tenantId,
+      approverRole: req.authUser.role,
+      approverTenantId: req.authUser.tenantId,
+    })
     reply.send({ user })
   })
 
@@ -183,19 +192,27 @@ export default async function authRoutes(app: FastifyInstance) {
     schema: { params: userParamsSchema, body: rejectRequestSchema },
   }, async (req, reply) => {
     const { userId } = req.params as { userId: string }
+    // Un admin regular solo puede rechazar solicitudes de su propio tenant
+    if (req.authUser.role !== 'superadmin' && req.authUser.tenantId) {
+      const requestToReject = (await db.select().from(users).where(eq(users.id, userId)).limit(1))[0]
+      if (!requestToReject) throw new AppError(404, 'Solicitud no encontrada')
+      if (requestToReject.tenantId && requestToReject.tenantId !== req.authUser.tenantId) {
+        throw new AppError(403, 'Solo puedes rechazar solicitudes de tu propio hotel')
+      }
+    }
     await rejectRequest(userId)
     reply.send({ ok: true })
   })
 
   typedApp.get('/api/auth/tenants', {
-    preHandler: [app.requireAdmin],
+    preHandler: [app.requireSuperAdmin],
   }, async () => {
     const list = await listTenants()
     return { tenants: list }
   })
 
   typedApp.post('/api/auth/tenants', {
-    preHandler: [app.requireAdmin],
+    preHandler: [app.requireSuperAdmin],
     schema: { body: createTenantSchema },
   }, async (req, reply) => {
     const input = req.body as CreateTenantInput
@@ -214,9 +231,17 @@ export default async function authRoutes(app: FastifyInstance) {
     schema: { body: createRecepcionSchema },
   }, async (req, reply) => {
     const { name, email, password } = req.body as CreateRecepcionInput
-    const adminTenantId = req.authUser.tenantId
+    let adminTenantId = req.authUser.tenantId
+
+    // Un superadmin puede crear recepción en cualquier tenant si se especifica
+    // En el futuro se podría agregar un campo tenantId opcional al body
     if (!adminTenantId) {
       throw new AppError(403, 'El administrador no tiene un hotel asignado')
+    }
+
+    // Si es superadmin y no tiene tenantId, no puede crear recepción (necesita especificar hotel)
+    if (req.authUser.role === 'superadmin' && !adminTenantId) {
+      throw new AppError(403, 'Debe especificar un hotel para crear una recepción')
     }
 
     const existing = (await db.select().from(users).where(eq(users.email, email)).limit(1))[0]

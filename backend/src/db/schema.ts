@@ -14,7 +14,7 @@ export const users = pgTable('users', {
   name: text('name').notNull(),
   email: text('email').notNull().unique(),
   passwordHash: text('password_hash').notNull(),
-  role: text('role', { enum: ['pendiente', 'admin', 'recepcion'] }).notNull().default('pendiente'),
+  role: text('role', { enum: ['pendiente', 'admin', 'recepcion', 'superadmin'] }).notNull().default('pendiente'),
   status: text('status', { enum: ['pendiente', 'activo', 'rechazado', 'suspendido'] }).notNull().default('pendiente'),
   tenantId: text('tenant_id').references(() => tenants.id),
   invitedBy: text('invited_by'),

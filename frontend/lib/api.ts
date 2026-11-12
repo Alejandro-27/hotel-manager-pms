@@ -16,7 +16,7 @@ export interface AuthUser {
   id: string
   name: string
   email: string
-  role: 'pendiente' | 'admin' | 'recepcion'
+  role: 'pendiente' | 'admin' | 'recepcion' | 'superadmin'
   status: string
   tenantId: string | null
   tenantName: string | null

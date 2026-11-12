@@ -214,7 +214,7 @@ export const api = {
         { method: 'DELETE' },
       ),
     createRecepcion: (input: CreateRecepcionInput) =>
-      request<{ user: AuthUser }>('/api/auth/recepcion', {
+      request<{ user: AuthUser; password?: string }>('/api/auth/recepcion', {
         method: 'POST',
         body: JSON.stringify(input),
       }),

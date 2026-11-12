@@ -313,6 +313,7 @@ export default async function authRoutes(app: FastifyInstance) {
         tenantName,
         termsAcceptedAt: created.termsAcceptedAt,
       },
+      password, // Contraseña en texto plano solo en esta respuesta de creación
     })
   })
 }

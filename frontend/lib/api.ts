@@ -44,6 +44,29 @@ export interface TenantInfo {
   slug: string
 }
 
+export interface SystemOverview {
+  totalTenants: number
+  totalUsers: number
+  activeUsers: number
+  pendingUsers: number
+  totalRooms: number
+  occupiedRooms: number
+  totalReservations: number
+  activeReservations: number
+  totalSales: number
+  totalRevenue: number
+}
+
+export interface TenantStats {
+  id: string
+  name: string
+  slug: string
+  userCount: number
+  roomCount: number
+  reservationCount: number
+  revenue: number
+}
+
 export interface ApproveRequestInput {
   userId: string
   role: 'admin' | 'recepcion'
@@ -213,6 +236,14 @@ export const api = {
         `/api/auth/tenants/${tenantId}`,
         { method: 'DELETE' },
       ),
+
+    /* ---------- Informes del sistema (solo superadmin) ---------- */
+
+    getSystemOverview: () =>
+      request<SystemOverview>('/api/auth/system-reports/overview'),
+    getTenantsWithStats: () =>
+      request<{ tenants: TenantStats[] }>('/api/auth/system-reports/tenants'),
+
     createRecepcion: (input: CreateRecepcionInput) =>
       request<{ user: AuthUser; password?: string }>('/api/auth/recepcion', {
         method: 'POST',

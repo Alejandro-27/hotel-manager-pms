@@ -20,6 +20,8 @@ import {
   listTenants,
   updateTenant,
   deleteTenant,
+  getSystemOverview,
+  getTenantsWithStats,
 } from './service.js'
 import {
   registerSchema,
@@ -247,6 +249,20 @@ export default async function authRoutes(app: FastifyInstance) {
     const { tenantId } = req.params as { tenantId: string }
     await deleteTenant(tenantId)
     reply.send({ ok: true })
+  })
+
+  /* ---------- Informes del sistema (solo superadmin) ---------- */
+
+  typedApp.get('/api/auth/system-reports/overview', {
+    preHandler: [app.requireSuperAdmin],
+  }, async () => {
+    return getSystemOverview()
+  })
+
+  typedApp.get('/api/auth/system-reports/tenants', {
+    preHandler: [app.requireSuperAdmin],
+  }, async () => {
+    return getTenantsWithStats()
   })
 
   /* ---------- Crear recepción ---------- */

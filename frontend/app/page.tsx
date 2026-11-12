@@ -20,6 +20,7 @@ import { ReportsView } from "@/components/views/reports-view"
 import { AdminRequestsView } from "@/components/views/admin-requests-view"
 import { TenantsView } from "@/components/views/tenants-view"
 import { RecepcionCreateView } from "@/components/views/recepcion-create-view"
+import { SystemReportsView } from "@/components/views/system-reports-view"
 import { AuthScreen } from "@/components/auth-screen"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useAuth } from "@/lib/auth-context"
@@ -43,6 +44,7 @@ const viewTitles: Record<string, string> = {
   adminRequests: "Solicitudes de cuenta",
   tenants: "Gestión de Hoteles",
   recepcionCreate: "Crear Recepcionista",
+  systemReports: "Informes del Sistema",
 }
 
 export default function Page() {
@@ -116,6 +118,7 @@ export default function Page() {
           {activeView === "adminRequests" && <AdminRequestsView />}
           {activeView === "tenants" && <TenantsView />}
           {activeView === "recepcionCreate" && <RecepcionCreateView />}
+          {activeView === "systemReports" && <SystemReportsView />}
 
           <footer className="mt-8 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 border-t pt-4 text-xs text-muted-foreground">
             <span>&copy; {new Date().getFullYear()} {user.tenantName?.trim() || "HotelManager"}</span>

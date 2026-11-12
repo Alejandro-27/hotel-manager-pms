@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { asc, eq, sql } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 import { db } from '../../db/index.js'
-import { refreshSessions, tenants, users } from '../../db/schema.js'
+import { refreshSessions, tenants, users, rooms, reservations, sales } from '../../db/schema.js'
 import { AppError } from '../../plugins/error-handler.js'
 import type { LoginInput, RegisterInput, UpdateProfileInput, UpdateTenantInput } from './schemas.js'
 import type { AuthUser } from '../../plugins/auth.js'
@@ -370,3 +370,91 @@ export async function deleteTenant(tenantId: string): Promise<void> {
 
   await db.delete(tenants).where(eq(tenants.id, tenantId))
 }
+
+/* ---------- Informes del sistema (solo superadmin) ---------- */
+
+export interface SystemOverview {
+  totalTenants: number
+  totalUsers: number
+  activeUsers: number
+  pendingUsers: number
+  totalRooms: number
+  occupiedRooms: number
+  totalReservations: number
+  activeReservations: number
+  totalSales: number
+  totalRevenue: number
+}
+
+export interface TenantStats {
+  id: string
+  name: string
+  slug: string
+  userCount: number
+  roomCount: number
+  reservationCount: number
+  revenue: number
+}
+
+export async function getSystemOverview(): Promise<SystemOverview> {
+  const [tenantCount, userCount, activeUserCount, pendingUserCount] = await Promise.all([
+    db.select({ count: sql<number>`count(*)` }).from(tenants),
+    db.select({ count: sql<number>`count(*)` }).from(users),
+    db.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.status, 'activo')),
+    db.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.status, 'pendiente')),
+  ])
+
+  const [roomCount, occupiedRoomCount] = await Promise.all([
+    db.select({ count: sql<number>`count(*)` }).from(rooms),
+    db.select({ count: sql<number>`count(*)` }).from(rooms).where(eq(rooms.status, 'ocupada')),
+  ])
+
+  const [reservationCount, activeReservationCount] = await Promise.all([
+    db.select({ count: sql<number>`count(*)` }).from(reservations),
+    db.select({ count: sql<number>`count(*)` }).from(reservations).where(eq(reservations.status, 'checkin')),
+  ])
+
+  const [salesResult] = await db.select({
+    totalSales: sql<number>`count(*)`,
+    totalRevenue: sql<number>`coalesce(sum(${sales.total}), 0)`,
+  }).from(sales)
+
+  return {
+    totalTenants: Number(tenantCount[0]?.count ?? 0),
+    totalUsers: Number(userCount[0]?.count ?? 0),
+    activeUsers: Number(activeUserCount[0]?.count ?? 0),
+    pendingUsers: Number(pendingUserCount[0]?.count ?? 0),
+    totalRooms: Number(roomCount[0]?.count ?? 0),
+    occupiedRooms: Number(occupiedRoomCount[0]?.count ?? 0),
+    totalReservations: Number(reservationCount[0]?.count ?? 0),
+    activeReservations: Number(activeReservationCount[0]?.count ?? 0),
+    totalSales: Number(salesResult?.totalSales ?? 0),
+    totalRevenue: Number(salesResult?.totalRevenue ?? 0),
+  }
+}
+
+export async function getTenantsWithStats(): Promise<TenantStats[]> {
+  const tenantList = await db.select({ id: tenants.id, name: tenants.name, slug: tenants.slug }).from(tenants)
+
+  const result = await Promise.all(tenantList.map(async (t) => {
+    const [userCount] = await db.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.tenantId, t.id))
+    const [roomCount] = await db.select({ count: sql<number>`count(*)` }).from(rooms).where(eq(rooms.tenantId, t.id))
+    const [resCount] = await db.select({ count: sql<number>`count(*)` }).from(reservations).where(eq(reservations.tenantId, t.id))
+    const [revenueResult] = await db.select({
+      revenue: sql<number>`coalesce(sum(${sales.total}), 0)`,
+    }).from(sales).where(eq(sales.tenantId, t.id))
+
+    return {
+      id: t.id,
+      name: t.name,
+      slug: t.slug,
+      userCount: Number(userCount?.count ?? 0),
+      roomCount: Number(roomCount?.count ?? 0),
+      reservationCount: Number(resCount?.count ?? 0),
+      revenue: Number(revenueResult?.revenue ?? 0),
+    }
+  }))
+
+  return result
+}
+

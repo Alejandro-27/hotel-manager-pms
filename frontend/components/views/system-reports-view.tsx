@@ -30,10 +30,12 @@ import {
   Loader2,
   ShieldAlert,
   AlertTriangle,
+  RefreshCw,
 } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import { api } from "@/lib/api"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
 
 interface SystemOverview {
   totalTenants: number
@@ -64,54 +66,70 @@ export function SystemReportsView() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchOverview = useCallback(async () => {
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
     try {
-      const data = await api.auth.getSystemOverview?.()
-      if (data) setOverview(data)
+      const [overviewData, tenantsData] = await Promise.all([
+        api.auth.getSystemOverview?.(),
+        api.auth.getTenantsWithStats?.(),
+      ])
+      if (overviewData) setOverview(overviewData)
+      if (tenantsData) setTenantStats(tenantsData.tenants)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al cargar informes del sistema")
+      const msg = err instanceof Error ? err.message : "Error desconocido al cargar informes del sistema"
+      setError(msg)
+      console.error("Error loading system reports:", err)
       toast({
         title: "Error al cargar informes del sistema",
-        description: err instanceof Error ? err.message : "Intente de nuevo",
+        description: msg,
         variant: "destructive",
       })
-    }
-  }, [])
-
-  const fetchTenantStats = useCallback(async () => {
-    try {
-      const data = await api.auth.getTenantsWithStats?.()
-      if (data) setTenantStats(data.tenants)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al cargar estadísticas de hoteles")
-      toast({
-        title: "Error al cargar estadísticas de hoteles",
-        description: err instanceof Error ? err.message : "Intente de nuevo",
-        variant: "destructive",
-      })
+    } finally {
+      setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    Promise.all([fetchOverview(), fetchTenantStats()]).finally(() => setLoading(false))
-  }, [fetchOverview, fetchTenantStats])
+    fetchData()
+  }, [fetchData])
 
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <p className="text-sm text-muted-foreground">Cargando informes del sistema...</p>
+        </div>
       </div>
     )
   }
 
   if (error && !overview && tenantStats.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px]">
-        <AlertTriangle className="mb-4 h-8 w-8 text-destructive" />
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-6">
+        <AlertTriangle className="mb-4 h-10 w-10 text-destructive" />
         <Alert variant="destructive">
-          <AlertTitle>Error cargando informes</AlertTitle>
+          <AlertTitle>Error cargando informes del sistema</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
+        <div className="mt-4 flex gap-3">
+          <Button onClick={() => fetchData()}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Reintentar
+          </Button>
+          <Button variant="outline" onClick={() => window.location.reload()}>
+            Recargar página
+          </Button>
+        </div>
+        <div className="mt-4 text-xs text-muted-foreground max-w-md px-4">
+          <p>Si el error persiste, verifique:</p>
+          <ul className="list-disc list-inside mt-1 text-left">
+            <li>Que el backend esté desplegado con los cambios más recientes en Render</li>
+            <li>Que su usuario tenga el rol <code>superadmin</code> en la base de datos</li>
+            <li>Que las cookies de sesión sean válidas (cierre sesión y vuelva a entrar)</li>
+          </ul>
+        </div>
       </div>
     )
   }
@@ -125,6 +143,15 @@ export function SystemReportsView() {
           <p className="text-muted-foreground">
             Vista general de todos los hoteles registrados en el sistema.
           </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => fetchData()}
+            disabled={loading}
+          >
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Actualizar
+          </Button>
         </div>
       </div>
 

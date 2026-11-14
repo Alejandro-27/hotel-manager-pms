@@ -7,32 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Loader2, RefreshCw } from "lucide-react"
 
-interface SystemOverview {
-  totalTenants: number
-  totalUsers: number
-  activeUsers: number
-  pendingUsers: number
-  totalRooms: number
-  occupiedRooms: number
-  totalReservations: number
-  activeReservations: number
-  totalSales: number
-  totalRevenue: number
-}
-
-interface TenantStats {
-  id: string
-  name: string
-  slug: string
-  userCount: number
-  roomCount: number
-  reservationCount: number
-  revenue: number
-}
-
 export function SystemReportsView() {
-  const [overview, setOverview] = useState<SystemOverview | null>(null)
-  const [tenantStats, setTenantStats] = useState<TenantStats[]>([])
+  const [overview, setOverview] = useState<any>(null)
+  const [tenantStats, setTenantStats] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -45,7 +22,7 @@ export function SystemReportsView() {
         api.auth.getTenantsWithStats?.(),
       ])
       if (overviewData) setOverview(overviewData)
-      if (tenantsData) setTenantStats(tenantsData.tenants)
+      if (tenantsData) setTenantStats(Array.isArray(tenantsData?.tenants) ? tenantsData.tenants : [])
     } catch (err: any) {
       setError(err?.message || "Error desconocido al cargar informes del sistema")
       console.error("Error loading system reports:", err)
@@ -74,14 +51,20 @@ export function SystemReportsView() {
           <AlertTitle>Error cargando informes del sistema</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
-        <Button onClick={fetchData}>
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Reintentar
-        </Button>
+        <div className="mt-4 flex gap-3">
+          <Button onClick={fetchData}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Reintentar
+          </Button>
+          <Button variant="outline" onClick={() => window.location.reload()}>
+            Recargar página
+          </Button>
+        </div>
         <div className="mt-4 text-xs text-muted-foreground max-w-md px-4">
           <ul className="list-disc list-inside mt-1 text-left">
             <li>Verifique que el backend esté desplegado en Render con los cambios más recientes</li>
             <li>Cierre sesión y vuelva a entrar para obtener un token con rol superadmin</li>
+            <li>Verifique que su usuario tenga el rol <code>superadmin</code> en la base de datos</li>
           </ul>
         </div>
       </div>
@@ -129,15 +112,30 @@ export function SystemReportsView() {
       </div>
 
       {tenantStats.length > 0 && (
-        <div>
-          <h2 className="text-lg font-semibold">Hoteles registrados</h2>
-          <ul>
-            {tenantStats.map((t) => (
-              <li key={t.id} className="border-b pb-2">
-                {t.name} - {t.revenue.toLocaleString()} ingresos
-              </li>
-            ))}
-          </ul>
+        <div className="bg-card border border-border p-4">
+          <h2 className="text-lg font-semibold mb-4">Hoteles registrados</h2>
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b">
+                <th className="pb-2 text-muted-foreground text-sm">Hotel</th>
+                <th className="pb-2 text-muted-foreground text-sm text-center">Usuarios</th>
+                <th className="pb-2 text-muted-foreground text-sm text-center">Habitaciones</th>
+                <th className="pb-2 text-muted-foreground text-sm text-center">Reservas</th>
+                <th className="pb-2 text-muted-foreground text-sm text-right">Ingresos</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tenantStats.map((t) => (
+                <tr key={t.id} className="border-b">
+                  <td className="py-2">{t.name}</td>
+                  <td className="py-2 text-center">{t.userCount}</td>
+                  <td className="py-2 text-center">{t.roomCount}</td>
+                  <td className="py-2 text-center">{t.reservationCount}</td>
+                  <td className="py-2 text-right">${t.revenue?.toLocaleString() ?? "0"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

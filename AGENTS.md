@@ -189,6 +189,7 @@ backend/                    ← @hotel/backend — Fastify API (PostgreSQL)
 
 - **Frontend**: Vitest + React Testing Library, tests unitarios en `*.test.ts`
 - **Backend**: Vitest (fastify.inject) contra una BD PostgreSQL dedicada (`hotel_manager_test`); testing manual con Bruno (46 requests)
+- **Verificación visual**: Playwright MCP disponible para inspección en tiempo real de páginas web, captura de console logs, y diagnóstico de errores de renderizado en producción (Cloudflare Pages + Render)
 - Cobertura mínima: helpers de utilidad, lógica de negocio, componentes críticos
 
 ## Reglas para dependencias

@@ -21,17 +21,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    api.auth
-      .me()
-      .then(setUser)
-      .catch(() => {
-        return api.auth
-          .refresh()
-          .then(() => api.auth.me())
-          .then(setUser)
-          .catch(() => setUser(null))
-      })
-      .finally(() => setIsLoading(false))
+    let cancelled = false
+
+    const initAuth = async () => {
+      try {
+        const userData = await api.auth.me()
+        if (!cancelled) setUser(userData)
+      } catch {
+        try {
+          const refreshed = await api.auth.refresh()
+          if (refreshed && !cancelled) {
+            const userData = await api.auth.me()
+            if (!cancelled) setUser(userData)
+          } else if (!cancelled) {
+            setUser(null)
+          }
+        } catch {
+          if (!cancelled) setUser(null)
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false)
+      }
+    }
+
+    initAuth()
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useEffect(() => {
@@ -57,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await api.auth.logout()
     } catch {
-      // El logout local debe funcionar aunque la cookie haya expirado
+      // El logout local debe funcionar aunque la cookie haya expirada
     }
     setUser(null)
     if (typeof window !== 'undefined') {

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
@@ -54,6 +55,11 @@ export function DashboardView() {
   const [error, setError] = useState<string | null>(null)
   const [checkingIn, setCheckingIn] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const router = useRouter()
+
+  const navigateTo = (path: string) => () => {
+    router.push(path)
+  }
 
   const load = useMemo(
     () => () => {
@@ -175,7 +181,10 @@ export function DashboardView() {
       {/* KPI Grid */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Occupancy */}
-        <Card>
+        <Card
+          onClick={navigateTo("/calendar")}
+          className="cursor-pointer hover:bg-muted/50 transition-colors"
+        >
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Tasa de Ocupacion</CardTitle>
             <BedDouble className="size-4 text-muted-foreground" />
@@ -206,7 +215,10 @@ export function DashboardView() {
         </Card>
 
         {/* Daily Revenue */}
-        <Card>
+        <Card
+          onClick={navigateTo("/reports")}
+          className="cursor-pointer hover:bg-muted/50 transition-colors"
+        >
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Ingresos Diarios</CardTitle>
             <DollarSign className="size-4 text-muted-foreground" />
@@ -224,7 +236,10 @@ export function DashboardView() {
         </Card>
 
         {/* Pending Check-ins */}
-        <Card>
+        <Card
+          onClick={navigateTo("/guests")}
+          className="cursor-pointer hover:bg-muted/50 transition-colors"
+        >
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Check-ins Pendientes</CardTitle>
             <ClipboardList className="size-4 text-muted-foreground" />
@@ -249,7 +264,10 @@ export function DashboardView() {
         </Card>
 
         {/* Inventory Alerts */}
-        <Card>
+        <Card
+          onClick={navigateTo("/pos")}
+          className="cursor-pointer hover:bg-muted/50 transition-colors"
+        >
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Alertas de Inventario</CardTitle>
             <AlertTriangle className="size-4 text-destructive" aria-hidden="true" />
@@ -275,7 +293,10 @@ export function DashboardView() {
 
       {/* Room Status Summary */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Card className="border-emerald-200/60">
+        <Card
+          onClick={navigateTo("/rooms")}
+          className="border-emerald-200/60 cursor-pointer hover:bg-emerald-50/50 transition-colors"
+        >
           <CardContent className="pt-5 pb-4 flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-md bg-emerald-100">
               <DoorOpen className="size-5 text-emerald-700" />
@@ -286,7 +307,10 @@ export function DashboardView() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-primary/20">
+        <Card
+          onClick={navigateTo("/rooms")}
+          className="border-primary/20 cursor-pointer hover:bg-primary/50 transition-colors"
+        >
           <CardContent className="pt-5 pb-4 flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-md bg-primary/10">
               <Users className="size-5 text-primary" />
@@ -297,7 +321,10 @@ export function DashboardView() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-sky-200/60">
+        <Card
+          onClick={navigateTo("/rooms")}
+          className="border-sky-200/60 cursor-pointer hover:bg-sky-50/50 transition-colors"
+        >
           <CardContent className="pt-5 pb-4 flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-md bg-sky-100">
               <Sparkles className="size-5 text-sky-700" />
@@ -308,7 +335,10 @@ export function DashboardView() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-amber-200/60">
+        <Card
+          onClick={navigateTo("/rooms")}
+          className="border-amber-200/60 cursor-pointer hover:bg-amber-50/50 transition-colors"
+        >
           <CardContent className="pt-5 pb-4 flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-md bg-amber-100">
               <Wrench className="size-5 text-amber-700" />

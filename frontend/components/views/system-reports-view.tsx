@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { api } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,8 +13,13 @@ export function SystemReportsView() {
   const [tenantStats, setTenantStats] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
 
-  const fetchData = async () => {
+  const navigateTo = (path: string) => () => {
+    router.push(path)
+  }
+
+  const fetchData = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
@@ -29,11 +35,11 @@ export function SystemReportsView() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     fetchData()
-  }, [])
+  }, [fetchData])
 
   if (loading) {
     return (
@@ -79,31 +85,46 @@ export function SystemReportsView() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        <Card>
+        <Card
+          onClick={navigateTo("/tenants")}
+          className="cursor-pointer hover:bg-muted/50 transition-colors"
+        >
           <CardHeader>
             <CardTitle className="text-sm">Hoteles</CardTitle>
           </CardHeader>
           <CardContent>{overview?.totalTenants ?? 0}</CardContent>
         </Card>
-        <Card>
+        <Card
+          onClick={navigateTo("/adminRequests")}
+          className="cursor-pointer hover:bg-muted/50 transition-colors"
+        >
           <CardHeader>
             <CardTitle className="text-sm">Usuarios</CardTitle>
           </CardHeader>
           <CardContent>{overview?.totalUsers ?? 0}</CardContent>
         </Card>
-        <Card>
+        <Card
+          onClick={navigateTo("/rooms")}
+          className="cursor-pointer hover:bg-muted/50 transition-colors"
+        >
           <CardHeader>
             <CardTitle className="text-sm">Habitaciones</CardTitle>
           </CardHeader>
           <CardContent>{overview?.totalRooms ?? 0}</CardContent>
         </Card>
-        <Card>
+        <Card
+          onClick={navigateTo("/calendar")}
+          className="cursor-pointer hover:bg-muted/50 transition-colors"
+        >
           <CardHeader>
             <CardTitle className="text-sm">Reservas</CardTitle>
           </CardHeader>
           <CardContent>{overview?.totalReservations ?? 0}</CardContent>
         </Card>
-        <Card>
+        <Card
+          onClick={navigateTo("/reports")}
+          className="cursor-pointer hover:bg-muted/50 transition-colors"
+        >
           <CardHeader>
             <CardTitle className="text-sm">Ingresos</CardTitle>
           </CardHeader>
